@@ -64,6 +64,7 @@ After changing anything in `.env`, run `pnpm run env:sync` (or just restart `pnp
 ```bash
 pnpm run dev
 ```
+If you are still having problems you can also try this copy and paste guide [COPY-PASTE-SETUP.md](COPY-PASTE-SETUP.md) 
 
 - App: [http://localhost:3000](http://localhost:3000)
 
