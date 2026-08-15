@@ -3,11 +3,19 @@ import Image from 'next/image'
 // Array of team members, quite a static method to store team members information, it work tho I am not sure it's the best
 const teamMembers = [
     {
-    name: 'Narwes',
+    name: 'Nawres Kas Toma',
     role: 'Project Manager',
-    description:
-        'Short description about the team member and their role within the project.',
-    image: '/images/team/Narwes.png',
+    description:(
+        <>
+            <p>
+                I’m a final-semester Bachelor of IT student majoring in Cyber Security, with experience in OSINT, penetration testing, and cybersecurity. 
+            </p>
+            <p>
+                I also competed nationally in WorldSkills Cyber Security and have a strong interest in offensive security and practical cybersecurity.
+            </p>
+        </>
+        ),
+    image: '/images/team/Nawres.png',
     },
     {
         name: 'Scarlet Heng',
