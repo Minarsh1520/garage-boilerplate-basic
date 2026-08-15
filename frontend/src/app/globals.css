@@ -12,6 +12,14 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@theme {
+  --color-brand-red: #B44446;
+  --color-brand-red-dark: #A32F31;
+  --color-brand-red-light: #DF6E71;
+}
+
+/* True culpit of faded text spotted, and tbf bg-white can be remove once this is change as well. Though it give me flashbang while code.
+Will not touch for now until teacher guidance are secure*/
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
