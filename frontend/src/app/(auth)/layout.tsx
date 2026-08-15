@@ -10,7 +10,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       {/* `flex items-center justify-center` + `max-w-sm` combo was clipping their
       full-width header down to a 384px column at every screen size, which is
       why the page looked mobile-only even on a desktop browser. */}
-      <div className="w-full bg-white">{children}</div>
+      {/*Adding bg-white here flip the color scheme on sign up page, hence it is gone*/}
+      <div className="w-full">{children}</div>
     </div>
   )
 }

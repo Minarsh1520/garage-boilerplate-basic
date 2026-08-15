@@ -23,10 +23,10 @@ const teamMembers = [
         description: (
         <>
             <p>
-                I’m a final-semester Bachelor of IT student majoring in Cyber Security, with experience in OSINT, penetration testing, and cybersecurity.
+                Final year in bachelor of IT with experience in systems, data, SAP, Power BI and Power Apps.
             </p>
             <p>
-                I also competed nationally in WorldSkills Cyber Security and have a strong interest in offensive security and practical cybersecurity.
+                Interested in business analysis, process improvement and using technology to solve business problems.
             </p>
         </>
         ),
@@ -90,15 +90,18 @@ const teamMembers = [
 export default function TeamPage() {
 
     return (
-    <div className = "flex flex-col bg-zinc-50">
+    // min-h-full stretches this div to fill <main>'s full content-box height
+    // (DashboardShell.tsx's <main> has a definite height via flexbox
+    <div className = "flex min-h-full flex-col bg-zinc-50 dark:bg-zinc-950">
         {/*Project Header*/}
-        <header className = "w-full bg-brand-red px-4 py-3 sm:px-6 md:px-8">
+        {/* max-w-4xl matches the content section below (line 112) so header, subheader, and cards share one width. */}
+        <header className = "mx-auto w-full max-w-4xl bg-brand-red px-4 py-3 sm:px-6 md:px-8">
         <h1 className = "text-lg font-normal text-white sm:text-xl md:text-2xl">
             Project 29 Garage - AI Assistant for HR
         </h1>
         </header>
       {/* Sub Header */}
-        <section className = "w-full bg-white px-4 py-2 sm:px-6 md:px-8">
+        <section className = "mx-auto w-full max-w-4xl bg-white px-4 py-2 sm:px-6 md:px-8">
         <h2 className = "text-md text-black font-medium sm:text-lg md:text-xl">
             Team Members
         </h2>
