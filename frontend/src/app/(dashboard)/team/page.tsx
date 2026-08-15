@@ -1,7 +1,6 @@
-'use client'
-
 import Image from 'next/image'
 
+// Array of team members, quite a static method to store team members information, it work tho I am not sure it's the best
 const teamMembers = [
     {
     name: 'Narwes',
@@ -146,34 +145,36 @@ export default function TeamPage() {
       {/* TeamPage Content */}
         <section className = "space-y-2 bg-brand-red p-2 sm:px-6 md:px-8">
         {teamMembers.map((member, index) => (
-        <article
-            key={index}
-            className="grid min-h-32 grid-cols-[20%_80%]"
-        >
-            {/* Red Section */}
-            <div className="flex items-center justify-center">
-                <Image
-                    src={member.image}
-                    alt={member.name}
-                    width={96}
-                    height={96}
-                    className="w-3/4 aspect-square rounded-full border-2 border-white object-cover"
-                />
-            </div>
-
-            {/* Content Section */}
-            <div className="rounded-r-lg border border-zinc-200 bg-white p-6 shadow-sm">
-                <h3 className="text-black font-semibold">{member.name}</h3>
-
-                <p className="text-black text-sm text-zinc-600">
-                    {member.role}
-                </p>
-
-                <div className="text-black mt-2 text-xs text-zinc-700">
-                    {member.description}
+            <article
+                key={member.name}
+                className="grid min-h-32 grid-cols-[20%_80%]"
+            >
+                <div className="flex items-center justify-center">
+                    <Image
+                        src={member.image}
+                        alt={member.name}
+                        width={128}
+                        height={128}
+                        priority={index === 0}
+                        className="aspect-square w-3/4 rounded-full border-2 border-white object-cover"
+                    />
                 </div>
-            </div>
-        </article>
+
+                <div className="rounded-r-lg border border-zinc-200 bg-white p-6 shadow-sm">
+                    <h3 className="font-semibold text-black">
+                        {member.name}
+                    </h3>
+
+                    <p className="text-sm text-zinc-600">
+                        {member.role}
+                    </p>
+
+                    <div className="mt-2 text-xs text-zinc-700">
+                        {member.description}
+                    </div>
+                </div>
+            </article>
+
         ))}
         </section>
     </div>
