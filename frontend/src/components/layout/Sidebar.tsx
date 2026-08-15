@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { LayoutDashboard, StickyNote, User, Settings, Users} from 'lucide-react'
 
-const navItems = [
+export const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/notes', label: 'Notes', icon: StickyNote },
   { href: '/profile', label: 'Profile', icon: User },
