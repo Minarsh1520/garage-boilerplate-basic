@@ -94,31 +94,29 @@ export default function TeamPage() {
     // (DashboardShell.tsx's <main> has a definite height via flexbox
     <div className = "flex min-h-full flex-col bg-zinc-50 dark:bg-zinc-950">
         {/*Project Header*/}
-        {/* max-w-4xl matches the content section below (line 112) so header, subheader, and cards share one width. */}
-        <header className = "mx-auto w-full max-w-4xl bg-brand-red px-4 py-3 sm:px-6 md:px-8">
+        {/*  PM wants the everything to be full width, so header, subheader, and cards share one width. */}
+        <header className = "w-full bg-brand-red px-4 py-3 sm:px-6 md:px-8">
         <h1 className = "text-lg font-normal text-white sm:text-xl md:text-2xl">
             Project 29 Garage - AI Assistant for HR
         </h1>
         </header>
       {/* Sub Header */}
-        <section className = "mx-auto w-full max-w-4xl bg-white px-4 py-2 sm:px-6 md:px-8">
+        <section className = "w-full bg-white px-4 py-2 sm:px-6 md:px-8">
         <h2 className = "text-md text-black font-medium sm:text-lg md:text-xl">
             Team Members
         </h2>
         </section>
       {/* TeamPage Content */}
-        {/* Added mx-auto + max-w-4xl: this is the actual scaling fix. Without
-            it, this section's width == DashboardShell's <main> width, which
-            has no cap of its own — so the grid-cols-[20%_80%] percentages
-            below keep growing as the monitor gets wider.*/}
-        <section className = "mx-auto w-full max-w-4xl space-y-2 bg-brand-red p-2 sm:px-6 md:px-8">
+        {/* Remove the cap on width limit*/}
+        <section className = "w-full flex-1 space-y-2 bg-brand-red p-2 sm:px-6 md:px-8">
         {teamMembers.map((member, index) => (
             <article
                 key={member.name}
-                // grid-cols-[20%_80%] -> grid-cols-[100px_1fr]: same grid,
-                // but a fixed pixel track for the avatar column instead of a
-                // percentage.
-                className="grid min-h-32 grid-cols-[100px_1fr] sm:grid-cols-[128px_1fr]"
+                // clamp(min, preferred, max): scales continuously with
+                // viewport width instead of jumping at sm:/md:/lg: —
+                // column and min-h share the same growth rate so the card
+                // stays proportional at every width, not just at breakpoints
+                className="grid min-h-[clamp(8rem,6rem+8vw,14rem)] grid-cols-[clamp(7rem,5rem+8vw,13rem)_1fr]"
             >
                 <div className="flex items-center justify-center">
                     <Image
@@ -135,16 +133,16 @@ export default function TeamPage() {
                     />
                 </div>
 
-                <div className="rounded-r-lg border border-zinc-200 bg-white p-6 shadow-sm">
-                    <h3 className="font-semibold text-black">
+                <div className="rounded-r-lg border border-zinc-200 bg-white p-[clamp(1rem,0.75rem+1vw,2rem)] shadow-sm">
+                    <h3 className="font-semibold text-black text-[clamp(0.875rem,0.75rem+0.6vw,1.25rem)]">
                         {member.name}
                     </h3>
 
-                    <p className="text-sm text-zinc-600">
+                    <p className="text-[clamp(0.75rem,0.65rem+0.5vw,1rem)] text-zinc-600">
                         {member.role}
                     </p>
 
-                    <div className="mt-2 text-xs text-zinc-700">
+                    <div className="mt-2 text-[clamp(0.75rem,0.65rem+0.5vw,1rem)] text-zinc-700">
                         {member.description}
                     </div>
                 </div>
