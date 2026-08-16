@@ -8,7 +8,8 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Navbar />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        {/* Remove the p-6 */}
+        <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
   )
