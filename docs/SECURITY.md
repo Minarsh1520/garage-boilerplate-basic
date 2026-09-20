@@ -221,6 +221,18 @@ Document this as a per-client hardening step in the forking guide.
 
 ---
 
+## Gemini API Key
+
+`GEMINI_API_KEY` is used only inside the chatbot's Server Action (`frontend/src/features/chatbot/actions/chatbot.actions.ts`) — server-only, never sent to the browser.
+
+**Rules:**
+- Never commit this value to version control
+- Never use a `NEXT_PUBLIC_` prefix
+- Store as a GitHub Actions secret for CI/CD, and directly in Vercel's Project Settings → Environment Variables for the deployed app
+- Rotate immediately if accidentally exposed: Google AI Studio → API keys → delete the key and issue a new one
+
+---
+
 ## Environment Variables
 
 | Classification | Rule |
