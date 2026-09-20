@@ -131,22 +131,25 @@ Security is enforced in independent layers — Claude Code guard hooks, HTTP har
 
 ### Known `pnpm audit` findings (manual fix)
 
+**Critical — outdated `next`.** Two unauthenticated-RCE CVEs affecting `next` `>=16.0.0 <16.3.3` (one Windows-hosted-server path traversal, one in the AVIF image-optimization path). Fix: bump the `next` version in both `package.json` (root) and `frontend/package.json` to `16.3.5` or later, then run `pnpm install`.
 
-`pnpm audit` currently flags two high-severity CVEs — both transitive, dev/build-time only, not runtime-reachable:
+**High-severity, transitive, dev/build-time only** — not runtime-reachable, but still worth patching:
 
 | Package | Issue | Pulled in by |
 |---------|-------|--------------|
-| `js-yaml` | CVE-2026-59870 — quadratic CPU DoS on `!!omap` resolution | eslint's dependency chain (lint-time only) |
+| `sharp` | libheif CVEs (GHSA-g89c-p67h-r497, GHSA-2jg2-4ch7-h545) | bundled inside `next`'s own image optimization |
+| `js-yaml` | GHSA-2883-xcg3-v3hh — quadratic CPU DoS on `!!omap` resolution | eslint's dependency chain (lint-time only) |
 | `nanoid` | Infinite loop when a custom generator's `size` is 0 | postcss, used by Tailwind/Next/Vitest builds (build-time only) |
 
-To patch: add these two lines under `overrides:` in `pnpm-workspace.yaml`, then run `pnpm install`:
+To patch the transitive ones: add these lines under `overrides:` in `pnpm-workspace.yaml`, then run `pnpm install`:
 
 ```yaml
-  js-yaml: '^4.3.1'
+  sharp: '^0.35.4'
+  js-yaml: '^4.3.2'
   nanoid: '^3.3.17'
 ```
 
-Confirm with `pnpm audit` — should show 0 high/critical findings.
+Confirm with `pnpm audit --audit-level=high` — should show 0 high/critical findings.
 
 ## Git Workflow
 
