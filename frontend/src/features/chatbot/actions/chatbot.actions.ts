@@ -13,24 +13,26 @@ export async function sendChatMessage(history: unknown): Promise<ActionResult<As
     return { success: false, error: parsed.error.errors[0]?.message ?? 'Invalid message history' }
   }
 
-  const question = parsed.data.at(-1)?.text
-  if (!question) {
-    return { success: false, error: 'No message to send' }
-  }
-
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
     return { success: false, error: 'GEMINI_API_KEY is not set — see docs/ENV-VARS.md' }
   }
 
-  // Single call, no retrieval/history/prompt-engineering yet — `parsed.data` already
-  // carries the full turn history for when that's needed, but today only the latest
-  // question is sent.
+  // Gemini calls its own past turns 'model', not 'assistant', and expects each
+  // turn wrapped as { role, parts: [{ text }] } rather than a plain string.
+  // Sending the whole conversation (not just the latest message) is what
+  // actually gives the model context on earlier turns - still no retrieval or
+  // document lookup here, that's a separate, larger piece of future work.
+  const contents = parsed.data.map((turn) => ({
+    role: turn.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: turn.text }],
+  }))
+
   try {
     const ai = new GoogleGenAI({ apiKey })
     const response = await ai.models.generateContent({
       model: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
-      contents: question,
+      contents,
     })
 
     return {
