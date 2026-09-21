@@ -13,14 +13,17 @@ overrides:
   # version too. postcss 8.x is backward-compatible within the major.
   postcss: '^8.5.18'
   # next also bundles an old sharp (image optimization) — force the patched line.
-  sharp: '^0.35.0'
-  # js-yaml (CVE-2026-59870) and nanoid highs from `pnpm audit` are disabled
-  # here — see README.md § Security for the manual fix.
-  js-yaml: '^4.3.1'
+  # ^0.35.0 previously let this resolve to 0.35.3, still vulnerable to the
+  # libheif CVEs (GHSA-g89c-p67h-r497, GHSA-2jg2-4ch7-h545) — fixed in 0.35.4.
+  sharp: '^0.35.4'
+  # js-yaml and nanoid highs from `pnpm audit` are disabled here — see
+  # README.md § Security for the manual fix.
+  js-yaml: '^4.3.2'
   nanoid: '^3.3.17'
 
 allowBuilds:
   '@firebase/util': true
+  '@google/genai': true
   esbuild: true
   lefthook: true
   protobufjs: true
