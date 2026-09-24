@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { getServerSession } from '@/actions/auth.actions'
 import { adminDb } from '@/lib/firebase/admin'
 
 export const metadata: Metadata = {
-  title: 'Dashboard',
+  title: 'Home',
 }
 
 export default async function DashboardPage() {
@@ -16,24 +17,73 @@ export default async function DashboardPage() {
   const greetingName = displayName ?? session?.email ?? null
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 px-6 py-5">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Welcome back{greetingName ? `, ${greetingName}` : ''}.
+        <h1 className="text-4xl font-bold tracking-tight text-[#222222]">
+          Home
+        </h1>
+
+        <p className="mt-1 text-sm text-[#222222]">
+          Need Help? Interact with our{' '}
+          <Link
+            href="/chatbot"
+            className="font-bold text-[#4361AB] underline"
+          >
+            AI Assistant
+          </Link>
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {(['Metric One', 'Metric Two', 'Metric Three'] as const).map((title) => (
-          <div
-            key={title}
-            className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-          >
-            <p className="text-sm font-medium text-zinc-500">{title}</p>
-            <p className="mt-2 text-3xl font-bold">—</p>
-          </div>
-        ))}
+      <div>
+        <h2 className="text-2xl font-bold text-[#222222]">
+          Checklist
+        </h2>
+
+        <div className="mt-2 border-t border-zinc-500">
+          {([
+            {
+              title: 'Personal Details Form',
+              description: 'Complete your personal details form',
+            },
+            {
+              title: 'Tax File Declaration',
+              description: 'Complete your tax file declaration',
+            },
+            {
+              title: 'Super Fund Nomination',
+              description: 'Complete your super fund nomination',
+            },
+            {
+              title: 'Read through company policies',
+              description: 'Read through the company policies',
+            },
+          ] as const).map((item) => (
+            <div
+              key={item.title}
+              className="flex items-start justify-between border-b border-zinc-500 py-3 px-1"
+            >
+              <div>
+                <p className="text-xl font-medium text-[#222222]">
+                  {item.title}
+                </p>
+
+                <p className="mt-1 text-sm text-zinc-600">
+                  {item.description}
+                </p>
+              </div>
+
+              <div className="text-right">
+                <p className="text-xs font-bold text-[#4361AB]">
+                  PENDING
+                </p>
+
+                <p className="mt-4 text-xs text-zinc-500">
+                  Due in: 1 Day
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
