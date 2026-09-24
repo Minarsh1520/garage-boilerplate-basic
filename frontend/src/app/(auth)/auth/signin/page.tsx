@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -13,6 +14,8 @@ import { FullPageSpinner } from '@/components/shared/LoadingSpinner'
 export default function SignInPage() {
   const router = useRouter()
   const { user, loading, signInWithEmail, signInWithGoogle } = useAuth()
+  const [showPassword, setShowPassword] = useState(false)
+  const [loginError, setLoginError] = useState<string | null>(null)
 
   const {
     register,
@@ -24,7 +27,7 @@ export default function SignInPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace('/team') // Redirect to the team page if the user is already signed in
+      router.replace('/dashboard') // Redirect to the home page if the user is already signed in
     }
   }, [loading, user, router])
 
@@ -38,16 +41,17 @@ export default function SignInPage() {
   if (loading) return <FullPageSpinner />
 
   const onSubmit = async (data: LoginInput) => {
+    setLoginError(null)
     try {
       await signInWithEmail(data.email, data.password)
       toast.success('Signed in successfully')
-      router.replace('/team')
+      router.replace('/dashboard')
       router.refresh()
     } catch (error: unknown) {
       if (error instanceof Error && error.message.includes('email-not-verified')) {
         toast.error('Please verify your email before signing in.')
       } else {
-        toast.error('Invalid email or password')
+        setLoginError('Incorrect e-mail or password.')
       }
     }
   }
@@ -55,7 +59,7 @@ export default function SignInPage() {
   const handleGoogleSignIn = async () => {
     try {
       await signInWithGoogle()
-      router.replace('/team')
+      router.replace('/dashboard')
     } catch {
       toast.error('Google sign-in failed. Please try again.')
     }
@@ -184,18 +188,18 @@ export default function SignInPage() {
    */
     <div className = "flex min-h-screen flex-col bg-white">
       {/*Project Header*/}
-      <header className = "w-full bg-brand-red px-4 py-3 sm:px-6 md:px-8">
-        <h1 className = "text-lg font-normal text-white sm:text-xl md:text-2xl">
-          Project 29 Garage - AI Assistant for HR
+      <header className = "w-full bg-[#4361AB] px-4 py-3 sm:px-6 md:px-8">
+        <h1 className = "text-lg font-bold text-white sm:text-xl md:text-2xl">
+          Employee Onboarding
         </h1>
       </header>
       {/* Login Page Content*/}
-      <main className = "flex flex-1 items-center justify-center px-4 py-10">
+      <main className = "flex flex-1 items-center justify-center px-4 pt-6 sm:pt-8">
         <div className = "w-full max-w-md space-y-6"> {/*Max width with limit to 448 px as per design*/}
 
           {/*Page heading*/}
           <div className = "text-center">
-            <h2 className = "text-2xl text-black font-bold tracking-tight sm:text-3xl">
+            <h2 className = "text-2xl text-[#222222] font-bold tracking-tight sm:text-3xl">
               Sign In
             </h2>
           </div>
@@ -207,8 +211,8 @@ export default function SignInPage() {
             className ="
               flex w-full items-center justify-center gap-3
               rounded-md border border-zinc-300
-              bg-white px-4 py-3
-              text-black
+              bg-zinc-200 px-4 py-2
+              text-[#222222]
               text-sm font-medium shadow-sm transition-colors
               hover:bg-zinc-50"
           >
@@ -250,16 +254,22 @@ export default function SignInPage() {
           {/*Email & Password Form*/}
           <form
             onSubmit = {handleSubmit(onSubmit)}
-            className = "space-y-4"
+            className = "space-y-3 rounded-xl border border-zinc-300 px-3 py-3"
           >
             {/*Email input field*/}
             <div className = "flex flex-col gap-1.5">
-              <label
-                htmlFor = "email"
-                className = "text-sm text-black font-medium"
-              >
-                E-mail
-              </label>
+              <div className = "flex items-center justify-between">
+                <label
+                  htmlFor = "email"
+                  className = "text-sm text-[#222222] font-medium"
+                >
+                  E-mail
+                </label>
+
+                <span className = "text-xs text-[#4361AB] sm:text-sm">
+                  Forgot e-mail?
+                </span>
+              </div>
               <input
               id = "email"
               type = "email"
@@ -289,26 +299,50 @@ export default function SignInPage() {
 
             {/*Password input field*/}
             <div className = "flex flex-col gap-1.5">
-              <label
-                htmlFor = "password"
-                className = "text-sm text-black font-medium"
-              >
-                Password
-              </label>
-              <input
-                id = "password"
-                type = "password"
-                autoComplete = "current-password"
-                aria-invalid = {!!errors.password}
-                aria-describedby = {errors.password ? 'password-error' : undefined}
-                placeholder = "Enter password..."
-                {...register('password')}
-                className ="
-                  w-full rounded-md border border-zinc-300
-                  bg-white px-3 py-2.5 text-sm shadow-sm
-                  placeholder:text-zinc-400 text-black focus:ring-2 focus:ring-zinc-500
-                  focus:outline-none aria-invalid:border-red-500"
-              />
+              <div className = "flex items-center justify-between">
+                <label
+                  htmlFor = "password"
+                  className = "text-sm text-[#222222] font-medium"
+                >
+                  Password
+                </label>
+
+                <Link
+                  href = "/auth/forgot-password"
+                  className = "text-xs text-[#4361AB] hover:underline sm:text-sm"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <div className = "relative">
+                <input
+                  id = "password"
+                  type = {showPassword ? 'text' : 'password'}
+                  autoComplete = "current-password"
+                  aria-invalid = {!!errors.password}
+                  aria-describedby = {errors.password ? 'password-error' : undefined}
+                  placeholder = "Enter password..."
+                  {...register('password')}
+                  className ="
+                    w-full rounded-md border border-zinc-300
+                    bg-white pl-3 pr-10 py-2.5 text-sm shadow-sm
+                    placeholder:text-zinc-400 text-black focus:ring-2 focus:ring-zinc-500
+                    focus:outline-none aria-invalid:border-red-500"
+                />
+
+                <button
+                  type = "button"
+                  onClick = {() => setShowPassword(!showPassword)}
+                  className = "absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500"
+                  aria-label = {showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className = "h-4 w-4" />
+                  ) : (
+                    <Eye className = "h-4 w-4" />
+                  )}
+                </button>
+              </div>
               {errors.password && (
                 <p
                   id = "password-error"
@@ -318,28 +352,44 @@ export default function SignInPage() {
                   {errors.password.message}
                 </p>
               )}
-              <div className = "flex justify-end">
-                <Link
-                  href = "/auth/forgot-password"
-                  className = "text-xs text-brand-red hover:underline sm:text-sm"
-                >
-                  Forgot password?
-                </Link>
-              </div>
             </div>
+
+            <label className = "flex items-center gap-2 text-xs text-[#222222] sm:text-sm">
+              <input
+                type = "checkbox"
+                className = "h-4 w-4 rounded border-zinc-300"
+              />
+              Keep me signed in
+            </label>
             
+            {loginError && (
+              <div
+                className = "flex items-center justify-between rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-600 sm:text-sm"
+                role = "alert"
+              >
+                <span>{loginError}</span>
+
+                <button
+                  type = "button"
+                  onClick = {() => setLoginError(null)}
+                  aria-label = "Close error"
+                >
+                  ×
+                </button>
+              </div>
+            )}
             {/*Submit button*/}
             <button
               type = "submit"
               disabled = {isSubmitting}
               className ="
-                w-full rounded-md bg-brand-red px-4 py-2.5 text-sm
+                w-full rounded-md bg-[#4361AB] px-4 py-2.5 text-sm
                 font-medium text-white transition-colors
-                hover:bg-brand-red-light active:bg-brand-red-dark
+                hover:bg-[#3B579A] active:bg-[#344E8C]
                 disabled:cursor-not-allowed disabled:opacity-50
                 "
             >
-              {isSubmitting ? 'Signing in…' : 'Sign in'}
+              {isSubmitting ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
             {/*Sign up link*/}
@@ -347,7 +397,7 @@ export default function SignInPage() {
               Don&apos;t have an account?{' '} {/* "'" = "&apos;", a bit weird but understandable*/}
               <Link
                 href = "/auth/signup"
-                className = "text-brand-red hover:underline"
+                className = "text-[#4361AB] hover:underline"
               >
                 Create one
               </Link>
