@@ -89,65 +89,93 @@ export function ChatWindow() {
   }
 
   return (
-    <div className="flex h-[70vh] flex-col rounded-lg border border-zinc-200 dark:border-zinc-800">
-      <div aria-live="polite" className="flex-1 space-y-4 overflow-y-auto p-4">
+    <div className="flex h-full min-h-[calc(100vh-56px)] flex-col bg-white">
+      <div
+        aria-live="polite"
+        className="flex-1 space-y-5 overflow-y-auto px-6 py-5"
+      >
         {messages.map((message) => {
-          const isEscalation = message.role === 'assistant' && message.kind === 'escalation'
+          const isEscalation =
+            message.role === 'assistant' && message.kind === 'escalation'
+
           return (
             <div
               key={message.id}
-              className={cn('flex flex-col', message.role === 'user' ? 'items-end' : 'items-start')}
+              className={cn(
+                'flex flex-col',
+                message.role === 'user' ? 'items-end' : 'items-start'
+              )}
             >
               <div
                 className={cn(
-                  'max-w-[75%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap',
+                  'max-w-[75%] rounded-md px-3 py-2 text-sm whitespace-pre-wrap',
                   message.role === 'user' &&
-                    'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900',
+                    'bg-zinc-200 text-[#222222]',
                   message.role === 'assistant' &&
                     !isEscalation &&
-                    'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100',
+                    'border border-[#4361AB] bg-[#E8F1F8] text-[#222222]',
                   isEscalation &&
-                    'border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100'
+                    'border border-amber-300 bg-amber-50 text-amber-900'
                 )}
               >
                 {message.text}
               </div>
-              <span className="mt-1 text-xs text-zinc-400">{formatDatetime(message.timestamp)}</span>
+
+              <span className="mt-1 text-xs text-zinc-500">
+                {formatDatetime(message.timestamp)}
+              </span>
             </div>
           )
         })}
 
-        {isPending && (
-          <div className="flex items-start">
-            <div className="flex items-center rounded-lg bg-zinc-100 px-3 py-2 dark:bg-zinc-800">
-              <LoadingSpinner size="sm" />
-            </div>
-          </div>
-        )}
-
         <div ref={bottomRef} />
       </div>
 
-      <div className="flex items-center gap-2 border-t border-zinc-200 p-3 dark:border-zinc-800">
-        <input
-          type="text"
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={isPending}
-          placeholder="Ask...."
-          aria-label="Message"
-          className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900"
-        />
-        <button
-          type="button"
-          onClick={() => void handleSend()}
-          disabled={isPending || !input.trim()}
-          aria-label="Send message"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
-        >
-          <Send className="h-4 w-4" />
-        </button>
+      <div className="px-4 pb-4 sm:px-6">
+        <div className="flex items-center gap-2 rounded-full border border-[#4361AB] bg-[#DDE8F2] p-1">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={isPending}
+              placeholder="Ask...."
+              aria-label="Message"
+              className="
+                w-full bg-transparent
+                px-4 py-2 pr-10
+                text-sm text-[#222222]
+                placeholder:text-[#4361AB]
+                outline-none
+                disabled:opacity-50
+              "
+            />
+
+            {isPending && (
+              <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                <LoadingSpinner size="sm" />
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void handleSend()}
+            disabled={isPending || !input.trim()}
+            aria-label="Send message"
+            className="
+              flex h-9 w-9 shrink-0
+              items-center justify-center
+              rounded-full
+              bg-[#4361AB]
+              text-white
+              disabled:opacity-50
+            "
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   )
