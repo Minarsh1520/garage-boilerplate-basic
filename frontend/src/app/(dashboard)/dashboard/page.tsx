@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getServerSession } from '@/actions/auth.actions'
 import { adminDb } from '@/lib/firebase/admin'
+import { getEmployeeOnboarding } from '@/lib/onboarding'
 
 export const metadata: Metadata = {
   title: 'Home',
@@ -9,6 +10,7 @@ export const metadata: Metadata = {
 
 export default async function DashboardPage() {
   const session = await getServerSession()
+  const onboarding = session ? await getEmployeeOnboarding(session.uid) : null
   const profileSnap = session ? await adminDb.collection('users').doc(session.uid).get() : null
 
   const displayName = profileSnap?.exists
@@ -39,51 +41,40 @@ export default async function DashboardPage() {
           Checklist
         </h2>
 
-        <div className="mt-2 border-t border-zinc-500">
-          {([
-            {
-              title: 'Personal Details Form',
-              description: 'Complete your personal details form',
-            },
-            {
-              title: 'Tax File Declaration',
-              description: 'Complete your tax file declaration',
-            },
-            {
-              title: 'Super Fund Nomination',
-              description: 'Complete your super fund nomination',
-            },
-            {
-              title: 'Read through company policies',
-              description: 'Read through the company policies',
-            },
-          ] as const).map((item) => (
-            <div
-              key={item.title}
-              className="flex items-start justify-between border-b border-zinc-500 py-3 px-1"
-            >
-              <div>
-                <p className="text-xl font-medium text-[#222222]">
-                  {item.title}
-                </p>
+        {!onboarding || onboarding.checklist.length === 0 ? (
+          <p className="mt-4 text-sm text-zinc-500">
+            No onboarding data available.
+          </p>
+        ) : (
+          <div className="mt-2 border-t border-zinc-500">
+            {onboarding.checklist.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-start justify-between border-b border-zinc-500 py-3 px-1"
+              >
+                <div>
+                  <p className="text-xl font-medium text-[#222222]">
+                    {item.title}
+                  </p>
 
-                <p className="mt-1 text-sm text-zinc-600">
-                  {item.description}
-                </p>
+                  <p className="mt-1 text-sm text-zinc-600">
+                    {item.description}
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <p className="text-xs font-bold text-[#4361AB]">
+                    {item.status.toUpperCase()}
+                  </p>
+
+                  <p className="mt-4 text-xs text-zinc-500">
+                    Due in: {item.duein}
+                  </p>
+                </div>
               </div>
-
-              <div className="text-right">
-                <p className="text-xs font-bold text-[#4361AB]">
-                  PENDING
-                </p>
-
-                <p className="mt-4 text-xs text-zinc-500">
-                  Due in: 1 Day
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
