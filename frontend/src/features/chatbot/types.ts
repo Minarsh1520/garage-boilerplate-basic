@@ -15,12 +15,12 @@ export const sendChatMessageSchema = z.array(chatTurnSchema).min(1).max(50)
 
 export type ChatTurn = z.infer<typeof chatTurnSchema>
 
-// 'answer' is a normal AI response. 'escalation' is reserved for when the real
-// backend can't answer confidently and should hand off to a human/HR channel
-// instead of guessing — not produced yet, but the UI already knows how to render it.
-export type AssistantMessageKind = 'answer' | 'escalation'
+// One kind per technical state in Nihal's escalation doc (LOADING is client-side only).
+export type AssistantMessageKind = 'answer' | 'clarify' | 'fallback' | 'escalate' | 'error'
 
 export interface AssistantReply {
   text: string
   kind: AssistantMessageKind
+  sources: { policyTitle: string; headingPath: string }[] // shown under answers
+  pathway?: 'HR' | 'IT' | 'Manager'                       // escalations only
 }

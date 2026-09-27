@@ -92,7 +92,7 @@ export function ChatWindow() {
     <div className="flex h-[70vh] flex-col rounded-lg border border-zinc-200 dark:border-zinc-800">
       <div aria-live="polite" className="flex-1 space-y-4 overflow-y-auto p-4">
         {messages.map((message) => {
-          const isEscalation = message.role === 'assistant' && message.kind === 'escalation'
+          const isEscalation = message.role === 'assistant' && message.kind === 'escalate'
           return (
             <div
               key={message.id}
