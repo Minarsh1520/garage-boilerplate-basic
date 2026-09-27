@@ -37,7 +37,8 @@ pnpm run env:sync       # also runs automatically before `pnpm run dev`
 | `STITCH_API_KEY` | **Yes** | No | Google Stitch key for the Claude Code MCP (stays in root `.env` only) |
 | `GEMINI_API_KEY` | **Yes** | Yes (for the chatbot) | Google AI (Gemini) API key, used only in the chatbot's Server Action — server-only, never sent to the browser |
 | `GEMINI_MODEL` | No | No | Gemini model id to call (default `gemini-3.6-flash`). Kept config-driven since the free-tier model lineup has already changed more than once |
-
+| `RAG_DISTANCE_THRESHOLD` | No | No (defaults to `0.38`) | Maximum cosine distance (0 = identical) for a policy chunk to count as relevant to a chatbot question. Lower is stricter; questions with no chunk within this distance get the fallback reply. Tune it by running `frontend/scripts/probe-rag.ts` after changing the policies. Synced to the frontend by `env:sync`; server-only, never `NEXT_PUBLIC_`. |
+| `DEMO_USER_PASSWORD` | Yes | Only for the seed script | Password for the demo login `alex.chen@northbridge.example`, created as a verified account by `frontend/scripts/seed-rag.ts`. Choose your own value locally and never commit it. Read only by the seed script via `--env-file=../.env`; not synced to the frontend or backend. |
 `NEXT_PUBLIC_*` values are compiled into the browser bundle — that prefix must **never** appear on a secret (a Claude Code hook blocks this).
 
 ## Generating the Service Account Key (Base64)
