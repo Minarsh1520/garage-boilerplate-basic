@@ -1,0 +1,19 @@
+# Placeholder policy file generate by Claude using BA docx
+# Code of Conduct / Employee Support Policy
+
+This policy sets out expected behaviour and where to get support at Northbridge Digital. It is fictional demo content created for the RMIT AI Assistant for HR project.
+
+## Workplace behaviour
+Employees are expected to act honestly, treat company information confidentially, follow safety procedures and use company systems for legitimate work purposes. Conflicts of interest must be disclosed to your manager.
+
+## Respectful workplace
+Northbridge Digital does not tolerate bullying, harassment or discrimination of any kind. Everyone is expected to treat colleagues, clients and visitors with respect. The Respect at Work training module explains these expectations in more detail.
+
+## When to contact HR or your manager
+Talk to your manager first about day-to-day work questions, workload or team matters. Contact HR directly about concerns you do not feel comfortable raising with your manager, questions about your employment conditions, or any workplace behaviour concern.
+
+## Sensitive matters
+Sensitive matters, including complaints, harassment, bullying, discrimination, personal wellbeing concerns, pay disputes and disciplinary matters, must be handled by a person, not the AI Assistant. For these matters, contact HR confidentially at hr@northbridge.example or 03 9000 1200.
+
+## Employee Assistance Program
+The Employee Assistance Program (EAP) offers free, confidential counselling for employees and their immediate family, available 24 hours a day on 1800 000 327. Using the EAP is confidential and is not reported to your manager.

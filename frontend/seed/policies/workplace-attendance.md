@@ -1,0 +1,16 @@
+# Placeholder policy file generate by Claude using BA docx
+# Workplace & Attendance Policy
+
+This policy explains working hours and attendance expectations at Northbridge Digital. It is fictional demo content created for the RMIT AI Assistant for HR project.
+
+## Expected work hours
+Standard hours are 38 hours per week. Core hours are 10:00 am to 3:00 pm, Monday to Friday, when all employees should be available. Outside core hours, you can agree a flexible start and finish time with your manager. New employees work from the office for their first two weeks; after that, hybrid work of up to two days from home per week can be agreed with your manager.
+
+## Attendance expectations
+Employees are expected to attend scheduled meetings, training and team events. Record your working location in the team calendar each week.
+
+## Lateness and absence notification
+If you will be late, message your manager before 9:30 am. If you are unwell or cannot attend work, notify your manager before your usual start time, by phone or team chat, and then submit personal leave in the Employee Portal.
+
+## Who to contact if you cannot attend work
+Contact your manager first. If you cannot reach your manager, contact the HR team on 03 9000 1200 or hr@northbridge.example.
