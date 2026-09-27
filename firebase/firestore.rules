@@ -76,5 +76,18 @@ service cloud.firestore {
     match /{document=**} {
       allow read, write: if false;
     }
+
+    // Policy chunks are server-only. The Admin SDK bypasses rules, so this only
+    // blocks browsers. Explicit (not just default-deny) so the intent is documented.
+    match /hrKnowledge/{chunkId} {
+      allow read, write: if false;
+    }
+
+    // Employees may read their own onboarding record (Home page checklist, later).
+    // No client writes: task status changes go through Server Actions.
+    match /onboardingProfiles/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
   }
 }
