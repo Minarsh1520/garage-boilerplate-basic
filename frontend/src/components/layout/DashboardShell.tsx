@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Sidebar } from './Sidebar'
 import { Navbar } from './Navbar'
+import { AppTour } from './AppTour'
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   return (
@@ -14,6 +15,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           {children}
         </main>
       </div>
+      <AppTour />
     </div>
   )
 }

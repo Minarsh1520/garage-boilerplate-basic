@@ -36,7 +36,7 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <div>
+      <div data-tour="checklist" className="relative">
         <h2 className="text-2xl font-bold text-[#222222]">
           Checklist
         </h2>
@@ -47,12 +47,12 @@ export default async function DashboardPage() {
           </p>
         ) : (
           <div className="mt-2 border-t border-zinc-500">
-            {onboarding.checklist.map((item) => (
+            {onboarding.checklist.map((item, index) => (
               <div
                 key={item.id}
                 className="flex items-start justify-between border-b border-zinc-500 py-3 px-1"
               >
-                <div>
+                <div data-tour={index === 0 ? 'task-details' : undefined} className="relative">
                   <p className="text-xl font-medium text-[#222222]">
                     {item.title}
                   </p>
@@ -62,7 +62,7 @@ export default async function DashboardPage() {
                   </p>
                 </div>
 
-                <div className="text-right">
+                <div data-tour={index === 0 ? 'task-status' : undefined} className="relative text-right">
                   <p className="text-xs font-bold text-[#4361AB]">
                     {item.status.toUpperCase()}
                   </p>
