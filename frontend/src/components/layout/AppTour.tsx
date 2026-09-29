@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { BotMessageSquare, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 export function AppTour() {
   const [step, setStep] = useState(1)
+  const router = useRouter()
 
   useEffect(() => {
     const checklist = document.querySelector<HTMLElement>(
@@ -17,6 +19,14 @@ export function AppTour() {
 
     const taskStatus = document.querySelector<HTMLElement>(
       '[data-tour="task-status"]'
+    )
+
+    const assistantLink = document.querySelector<HTMLElement>(
+      '[data-tour="assistant-link"]'
+    )
+
+    const assistantNav = document.querySelector<HTMLElement>(
+      '[data-tour="assistant-nav"]'
     )
 
     if (checklist) {
@@ -34,6 +44,16 @@ export function AppTour() {
       taskStatus.style.backgroundColor = step === 4 ? 'white' : ''
     }
 
+    if (assistantLink) {
+      assistantLink.style.zIndex = step === 5 ? '60' : ''
+      assistantLink.style.backgroundColor = step === 5 ? 'white' : ''
+    }
+
+    if (assistantNav) {
+      assistantNav.style.zIndex = step === 5 ? '60' : ''
+      assistantNav.style.backgroundColor = step === 5 ? 'white' : ''
+    }
+
     return () => {
       if (checklist) {
         checklist.style.zIndex = ''
@@ -48,6 +68,16 @@ export function AppTour() {
       if (taskStatus) {
         taskStatus.style.zIndex = ''
         taskStatus.style.backgroundColor = ''
+      }
+
+      if (assistantLink) {
+        assistantLink.style.zIndex = ''
+        assistantLink.style.backgroundColor = ''
+      }
+
+      if (assistantNav) {
+        assistantNav.style.zIndex = ''
+        assistantNav.style.backgroundColor = ''
       }
     }
   }, [step])
@@ -185,7 +215,7 @@ export function AppTour() {
               </h3>
 
               <p className="mt-1 text-xs text-[#222222]">
-                It also contains the status of your task, and when it&apos;s due.
+                It also contains the status of your task, and when it's due.
               </p>
             </div>
           </div>
@@ -203,6 +233,201 @@ export function AppTour() {
               <button
                 type="button"
                 onClick={() => setStep(3)}
+                className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStep(5)}
+                className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {step === 5 && (
+        <div className="fixed right-8 top-16 z-[70] w-[190px] rounded-lg border border-[#4361AB] bg-white p-4 shadow-lg">
+          <div className="flex gap-3">
+            <BotMessageSquare className="h-9 w-9 shrink-0 text-[#4361AB]" />
+
+            <div>
+              <h3 className="font-bold text-[#222222]">
+                AI Assistant
+              </h3>
+
+              <p className="mt-1 text-xs text-[#222222]">
+                If you need any help when it comes to onboarding, chat with our AI assistant.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setStep(0)}
+              className="rounded px-2 py-1 text-[10px] text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]"
+            >
+              SKIP TOUR
+            </button>
+
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => setStep(4)}
+                className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStep(6)}
+                className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {step === 6 && (
+        <div className="fixed right-8 top-16 z-[70] w-[190px] rounded-lg border border-[#4361AB] bg-white p-4 shadow-lg">
+          <div className="flex gap-3">
+            <BotMessageSquare className="h-9 w-9 shrink-0 text-[#4361AB]" />
+
+            <div>
+              <h3 className="font-bold text-[#222222]">
+                AI Assistant
+              </h3>
+
+              <p className="mt-1 text-xs text-[#222222]">
+                We'll move to the assistant page now, click next!
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setStep(0)}
+              className="rounded px-2 py-1 text-[10px] text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]"
+            >
+              SKIP TOUR
+            </button>
+
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => setStep(5)}
+                className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {setStep(7) 
+                  router.push('/chatbot')
+                }}
+                className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {step === 7 && (
+        <div className="fixed right-8 top-16 z-[70] w-[190px] rounded-lg border border-[#4361AB] bg-white p-4 shadow-lg">
+          <div className="flex gap-3">
+            <BotMessageSquare className="h-9 w-9 shrink-0 text-[#4361AB]" />
+
+            <div>
+              <h3 className="font-bold text-[#222222]">
+                Chatbot Page
+              </h3>
+
+              <p className="mt-1 text-xs text-[#222222]">
+                You can chat with our Assistant here!
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setStep(0)}
+              className="rounded px-2 py-1 text-[10px] text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]"
+            >
+              SKIP TOUR
+            </button>
+
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep(6)
+                  router.push('/dashboard')
+                }}
+                className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStep(8)}
+                className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {step === 8 && (
+        <div className="fixed right-8 top-16 z-[70] w-[190px] rounded-lg border border-[#4361AB] bg-white p-4 shadow-lg">
+          <div className="flex gap-3">
+            <BotMessageSquare className="h-9 w-9 shrink-0 text-[#4361AB]" />
+
+            <div>
+              <h3 className="font-bold text-[#222222]">
+                What can you do?
+              </h3>
+
+              <p className="mt-1 text-xs text-[#222222]">
+                You can use it to:
+              </p>
+
+              <ul className="mt-1 list-disc pl-4 text-xs text-[#222222]">
+                <li>Understand onboarding tasks</li>
+                <li>Find relevant onboarding information</li>
+                <li>Ask common onboarding questions</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setStep(0)}
+              className="rounded px-2 py-1 text-[10px] text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]"
+            >
+              SKIP TOUR
+            </button>
+
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => setStep(7)}
                 className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"
               >
                 <ChevronLeft className="h-4 w-4" />

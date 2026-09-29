@@ -22,8 +22,9 @@ export function Sidebar() {
           <Link
             key={href}
             href={href}
+            data-tour={href === '/chatbot' ? 'assistant-nav' : undefined}
             className="
-              flex items-center gap-3
+              relative flex items-center gap-3
               px-2 py-2
               text-lg font-semibold text-[#4361AB]
               transition-colors hover:underline

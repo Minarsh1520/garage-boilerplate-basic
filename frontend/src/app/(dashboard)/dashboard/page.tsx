@@ -29,7 +29,8 @@ export default async function DashboardPage() {
           Need Help? Interact with our{' '}
           <Link
             href="/chatbot"
-            className="font-bold text-[#4361AB] underline"
+            data-tour="assistant-link"
+            className="relative inline-block rounded px-2 py-1 font-bold text-[#4361AB] underline"
           >
             AI Assistant
           </Link>
