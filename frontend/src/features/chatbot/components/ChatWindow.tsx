@@ -76,6 +76,7 @@ export function ChatWindow() {
           timestamp: new Date(),
         },
       ])
+      window.dispatchEvent(new Event('tour-response-ready'))
     } finally {
       setIsPending(false)
     }
@@ -94,9 +95,9 @@ export function ChatWindow() {
         aria-live="polite"
         className="flex-1 space-y-5 overflow-y-auto px-6 py-5"
       >
-        {messages.map((message) => {
-          const isEscalation =
-            message.role === 'assistant' && message.kind === 'escalation'
+        {messages.map((message, index) => {
+          const isEscalation = message.role === 'assistant' && message.kind === 'escalation'
+          const isLatestAssistant = message.role === 'assistant' && message.id !== 'greeting' && index === messages.length - 1
 
           return (
             <div
@@ -106,7 +107,7 @@ export function ChatWindow() {
                 message.role === 'user' ? 'items-end' : 'items-start'
               )}
             >
-              <div
+              <div data-tour={isLatestAssistant ? 'assistant-response' : undefined}
                 className={cn(
                   'max-w-[75%] rounded-md px-3 py-2 text-sm whitespace-pre-wrap',
                   message.role === 'user' &&
@@ -132,7 +133,7 @@ export function ChatWindow() {
       </div>
 
       <div className="px-4 pb-4 sm:px-6">
-        <div className="flex items-center gap-2 rounded-full border border-[#4361AB] bg-[#DDE8F2] p-1">
+        <div data-tour="chat-input" className=" relative flex items-center gap-2 rounded-full border border-[#4361AB] bg-[#DDE8F2] p-1">
           <div className="relative flex-1">
             <input
               type="text"
