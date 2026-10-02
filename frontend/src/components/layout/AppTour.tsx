@@ -3,10 +3,18 @@
 import { useEffect, useState } from 'react'
 import { BotMessageSquare, ChevronLeft, ChevronRight, CircleCheckBig } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useAuthContext } from '@/providers/AuthProvider'
+import { completeAppTour } from '@/actions/auth.actions'
 
 export function AppTour() {
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(0)
+  const { user, profile, loading } = useAuthContext()
   const router = useRouter()
+  useEffect(() => {
+    if (!loading && user && profile?.tourCompleted !== true) {
+      setStep(1)
+    }
+  }, [loading, user, profile])
 
   useEffect(() => {
     const checklist = document.querySelector<HTMLElement>(
@@ -122,6 +130,14 @@ export function AppTour() {
 
   if (step === 0) return null
 
+  async function completeTour() {
+    const result = await completeAppTour()
+
+    if (result.success){
+      setStep(0)
+    }
+  }
+
   return (
     <>
       {step !== 11 && step !== 12 && (
@@ -152,7 +168,7 @@ export function AppTour() {
 
               <button
                 type="button"
-                onClick={() => setStep(0)}
+                onClick={() => void completeTour()}
                 className="rounded-md border border-[#4361AB] px-3 py-2 font-bold text-[#222222] hover:bg-[#EEF3FA]"
               >
                 NO
@@ -181,7 +197,7 @@ export function AppTour() {
           <div className="mt-4 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setStep(0)}
+              onClick={() => void completeTour()}
               className="rounded px-2 py-1 text-[10px] text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]"
             >
               SKIP TOUR
@@ -217,7 +233,7 @@ export function AppTour() {
           <div className="mt-4 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setStep(0)}
+              onClick={() => void completeTour()}
               className="rounded px-2 py-1 text-[10px] text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]"
             >
               SKIP TOUR
@@ -263,7 +279,7 @@ export function AppTour() {
           <div className="mt-4 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setStep(0)}
+              onClick={() => void completeTour()}
               className="rounded px-2 py-1 text-[10px] text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]"
             >
               SKIP TOUR
@@ -309,7 +325,7 @@ export function AppTour() {
           <div className="mt-4 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setStep(0)}
+              onClick={() => void completeTour()}
               className="rounded px-2 py-1 text-[10px] text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]"
             >
               SKIP TOUR
@@ -355,7 +371,7 @@ export function AppTour() {
           <div className="mt-4 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setStep(0)}
+              onClick={() => void completeTour()}
               className="rounded px-2 py-1 text-[10px] text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]"
             >
               SKIP TOUR
@@ -403,7 +419,7 @@ export function AppTour() {
           <div className="mt-4 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setStep(0)}
+              onClick={() => void completeTour()}
               className="rounded px-2 py-1 text-[10px] text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]"
             >
               SKIP TOUR
@@ -458,7 +474,7 @@ export function AppTour() {
           <div className="mt-4 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setStep(0)}
+              onClick={() => void completeTour()}
               className="rounded px-2 py-1 text-[10px] text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]"
             >
               SKIP TOUR
@@ -517,7 +533,7 @@ export function AppTour() {
           <div className="mt-4 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setStep(0)}
+              onClick={() => void completeTour()}
               className="rounded px-2 py-1 text-[10px] text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]"
             >
               SKIP TOUR
@@ -563,7 +579,7 @@ export function AppTour() {
           <div className="mt-4 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setStep(0)}
+              onClick={() => void completeTour()}
               className="rounded px-2 py-1 text-[10px] text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]"
             >
               SKIP TOUR
@@ -609,7 +625,7 @@ export function AppTour() {
           <div className="mt-4 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setStep(0)}
+              onClick={() => void completeTour()}
               className="rounded px-2 py-1 text-[10px] text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]"
             >
               SKIP TOUR
@@ -645,7 +661,7 @@ export function AppTour() {
           <div className="mt-4 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setStep(0)}
+              onClick={() => void completeTour()}
               className="rounded px-2 py-1 text-[10px] text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]"
             >
               SKIP TOUR
@@ -693,7 +709,7 @@ export function AppTour() {
           <div className="mt-4 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setStep(0)}
+              onClick={() => void completeTour()}
               className="rounded px-2 py-1 text-[10px] text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]"
             >
               SKIP TOUR
@@ -769,8 +785,8 @@ export function AppTour() {
 
             <button
               type="button"
-              onClick={() => {
-                setStep(0)
+              onClick={async () => { 
+                await completeTour()
                 router.push('/dashboard')
               }}
               className="mt-4 rounded-md bg-[#4361AB] px-4 py-2 font-bold text-white hover:bg-[#3B579A]"

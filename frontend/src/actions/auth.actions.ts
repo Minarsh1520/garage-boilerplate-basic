@@ -60,3 +60,24 @@ export async function serverSignOut(): Promise<ActionResult> {
     return { success: false, error: 'Failed to sign out' }
   }
 }
+
+export async function completeAppTour(): Promise<ActionResult> {
+  try {
+    const session = await requireAuth()
+
+    await adminDb
+      .collection('users')
+      .doc(session.uid)
+      .set(
+        {
+          tourCompleted: true,
+          updatedAt: new Date(),
+        },
+        { merge: true }
+      )
+
+    return { success: true }
+  } catch {
+    return { success: false, error: 'Failed to complete app tour' }
+  }
+}
