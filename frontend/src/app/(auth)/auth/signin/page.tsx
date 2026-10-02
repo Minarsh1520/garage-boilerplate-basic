@@ -13,7 +13,7 @@ import { FullPageSpinner } from '@/components/shared/LoadingSpinner'
 
 export default function SignInPage() {
   const router = useRouter()
-  const { user, loading, signInWithEmail, signInWithGoogle } = useAuth()
+  const { user, profile, loading, signInWithEmail, signInWithGoogle } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [loginError, setLoginError] = useState<string | null>(null)
 
@@ -26,10 +26,15 @@ export default function SignInPage() {
   })
 
   useEffect(() => {
-    if (!loading && user) {
-      router.replace('/dashboard') // Redirect to the home page if the user is already signed in
+    if (!loading && user && profile) {
+      if (profile.role === 'admin'){
+        router.replace('/admin')
+      } else {
+        router.replace('/dashboard')
+      }
+      
     }
-  }, [loading, user, router])
+  }, [loading, user, profile, router])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -45,7 +50,7 @@ export default function SignInPage() {
     try {
       await signInWithEmail(data.email, data.password)
       toast.success('Signed in successfully')
-      router.replace('/dashboard')
+      
       router.refresh()
     } catch (error: unknown) {
       if (error instanceof Error && error.message.includes('email-not-verified')) {
@@ -59,7 +64,7 @@ export default function SignInPage() {
   const handleGoogleSignIn = async () => {
     try {
       await signInWithGoogle()
-      router.replace('/dashboard')
+      
     } catch {
       toast.error('Google sign-in failed. Please try again.')
     }
