@@ -7,22 +7,29 @@ import { LogOut, Menu, User, X } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { navItems } from './Sidebar'
 
-export function Navbar() {
+export function Navbar({
+  showMobileMenu = true,
+}: {
+  showMobileMenu?: boolean
+}) {
   const router = useRouter()
   const { user, signOut } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
 
-  // Escape closes the mobile drawer, matching standard dialog behavior
   useEffect(() => {
     if (!menuOpen) return
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false)
+      if (e.key === 'Escape') {
+        setMenuOpen(false)
+      }
     }
 
     window.addEventListener('keydown', onKeyDown)
 
-    return () => window.removeEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+    }
   }, [menuOpen])
 
   const handleSignOut = async () => {
@@ -36,15 +43,17 @@ export function Navbar() {
       <header className="flex h-14 items-center justify-between bg-[#4361AB] px-4 sm:px-6">
         {/* Left side */}
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setMenuOpen(true)}
-            aria-label="Open navigation menu"
-            aria-expanded={menuOpen}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-white transition-colors hover:bg-white/10 lg:hidden"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
+          {showMobileMenu && (
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              aria-label="Open navigation menu"
+              aria-expanded={menuOpen}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-white transition-colors hover:bg-white/10 lg:hidden"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          )}
 
           <span className="text-2xl font-bold text-white sm:text-3xl">
             Employee Onboarding
@@ -80,8 +89,8 @@ export function Navbar() {
         </div>
       </header>
 
-      {/* Mobile navigation drawer */}
-      {menuOpen && (
+      
+      {showMobileMenu && menuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div
             className="fixed inset-0 bg-black/40"

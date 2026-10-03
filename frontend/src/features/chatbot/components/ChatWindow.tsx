@@ -7,14 +7,16 @@ import { toast } from 'sonner'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { cn, formatDatetime } from '@/lib/utils'
 import { sendChatMessage } from '@/features/chatbot/actions/chatbot.actions'
-import type { AssistantMessageKind, ChatTurn } from '@/features/chatbot/types'
+import type {
+  AssistantMessageKind,
+  ChatTurn,
+} from '@/features/chatbot/types'
 
 interface Message {
   id: string
   role: 'user' | 'assistant'
   text: string
   timestamp: Date
-  // Only meaningful on assistant messages — see AssistantMessageKind for why.
   kind?: AssistantMessageKind
 }
 
@@ -27,6 +29,7 @@ export function ChatWindow() {
       timestamp: new Date(),
     },
   ])
+
   const [input, setInput] = useState('')
   const [isPending, setIsPending] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -37,6 +40,7 @@ export function ChatWindow() {
 
   async function handleSend() {
     const question = input.trim()
+
     if (!question || isPending) return
 
     const userMessage: Message = {
@@ -45,16 +49,21 @@ export function ChatWindow() {
       text: question,
       timestamp: new Date(),
     }
+
     const nextMessages = [...messages, userMessage]
+
     setMessages(nextMessages)
     setInput('')
     setIsPending(true)
 
     try {
-      // Send the whole thread, not just the latest question — the stub ignores
-      // everything but the last turn today, but a real multi-turn backend can
-      // use this same call shape without the client needing to change.
-      const history: ChatTurn[] = nextMessages.map(({ role, text }) => ({ role, text }))
+      const history: ChatTurn[] = nextMessages.map(
+        ({ role, text }) => ({
+          role,
+          text,
+        })
+      )
+
       const result = await sendChatMessage(history)
 
       if (!result.success || !result.data) {
@@ -62,8 +71,6 @@ export function ChatWindow() {
         return
       }
 
-      // Extracted to a local so TS's narrowing survives into the setState callback below —
-      // narrowing a property like `result.data` doesn't carry across closure boundaries.
       const reply = result.data
 
       setMessages((prev) => [
@@ -76,6 +83,7 @@ export function ChatWindow() {
           timestamp: new Date(),
         },
       ])
+
       window.dispatchEvent(new Event('tour-response-ready'))
     } finally {
       setIsPending(false)
@@ -90,26 +98,40 @@ export function ChatWindow() {
   }
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-56px)] flex-col bg-white">
+    <div className="flex h-full min-h-0 flex-col bg-white">
+      {/* Messages */}
       <div
         aria-live="polite"
-        className="flex-1 space-y-5 overflow-y-auto px-6 py-5"
+        className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-4 sm:space-y-5 sm:px-6 sm:py-5"
       >
         {messages.map((message, index) => {
-          const isEscalation = message.role === 'assistant' && message.kind === 'escalation'
-          const isLatestAssistant = message.role === 'assistant' && message.id !== 'greeting' && index === messages.length - 1
+          const isEscalation =
+            message.role === 'assistant' &&
+            message.kind === 'escalation'
+
+          const isLatestAssistant =
+            message.role === 'assistant' &&
+            message.id !== 'greeting' &&
+            index === messages.length - 1
 
           return (
             <div
               key={message.id}
               className={cn(
                 'flex flex-col',
-                message.role === 'user' ? 'items-end' : 'items-start'
+                message.role === 'user'
+                  ? 'items-end'
+                  : 'items-start'
               )}
             >
-              <div data-tour={isLatestAssistant ? 'assistant-response' : undefined}
+              <div
+                data-tour={
+                  isLatestAssistant
+                    ? 'assistant-response'
+                    : undefined
+                }
                 className={cn(
-                  'max-w-[75%] rounded-md px-3 py-2 text-sm whitespace-pre-wrap',
+                  'max-w-[85%] break-words rounded-md px-3 py-2 text-sm whitespace-pre-wrap sm:max-w-[75%]',
                   message.role === 'user' &&
                     'bg-zinc-200 text-[#222222]',
                   message.role === 'assistant' &&
@@ -122,7 +144,7 @@ export function ChatWindow() {
                 {message.text}
               </div>
 
-              <span className="mt-1 text-xs text-zinc-500">
+              <span className="mt-1 text-[10px] text-zinc-500 sm:text-xs">
                 {formatDatetime(message.timestamp)}
               </span>
             </div>
@@ -132,24 +154,31 @@ export function ChatWindow() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="px-4 pb-4 sm:px-6">
-        <div data-tour="chat-input" className=" relative flex items-center gap-2 rounded-full border border-[#4361AB] bg-[#DDE8F2] p-1">
-          <div className="relative flex-1">
+      
+      <div className="shrink-0 px-3 pb-3 sm:px-6 sm:pb-4">
+        <div
+          data-tour="chat-input"
+          className="relative flex items-center gap-2 rounded-full border border-[#4361AB] bg-[#DDE8F2] p-1"
+        >
+          <div className="relative min-w-0 flex-1">
             <input
               type="text"
               value={input}
-              onChange={(event) => setInput(event.target.value)}
+              onChange={(event) =>
+                setInput(event.target.value)
+              }
               onKeyDown={handleKeyDown}
               disabled={isPending}
               placeholder="Ask...."
               aria-label="Message"
               className="
                 w-full bg-transparent
-                px-4 py-2 pr-10
+                px-3 py-2 pr-10
                 text-sm text-[#222222]
                 placeholder:text-[#4361AB]
                 outline-none
                 disabled:opacity-50
+                sm:px-4
               "
             />
 
