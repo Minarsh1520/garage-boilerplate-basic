@@ -1,6 +1,6 @@
 import type { GoogleGenAI } from '@google/genai'
 import { EMBED_DIM, EMBED_MODEL } from './config'
-
+import { withRetry } from './retry'
 // taskType shapes the vector for its role: RETRIEVAL_DOCUMENT when storing policy
 // text, RETRIEVAL_QUERY when embedding a question, so questions land near their
 // answers. Mixing them up degrades match quality silently.
@@ -9,11 +9,11 @@ export async function embedText(
     text: string,
     taskType: 'RETRIEVAL_DOCUMENT' | 'RETRIEVAL_QUERY'
     ): Promise<number[]> {
-    const result = await ai.models.embedContent({
+    const result = await withRetry(() => ai.models.embedContent({
         model: EMBED_MODEL,
         contents: text,
         config: { taskType, outputDimensionality: EMBED_DIM },
-    })
+    }), 2)
     const values = result.embeddings?.[0]?.values
     // Fail loudly on a wrong shape. The vector index would reject it anyway, but a
     // clear error here is much easier to debug.
