@@ -14,7 +14,8 @@ export interface UserProfile {
   email: string
   displayName: string | null
   photoURL: string | null
-  role: 'user'
+  role: 'user' | 'admin'
+  tourCompleted?: boolean
   createdAt: Timestamp
   updatedAt: Timestamp
   _schemaVersion: 1
@@ -46,17 +47,6 @@ export interface PolicyChunk {
   _schemaVersion: 1
 }
 
-// Demo employee record (BA doc: Alex Chen, EMP001). Document ID = Firebase Auth uid,
-// so the agent can only ever read the signed-in user's own record (see agent/tools.ts).
-// "Onboarding Status" is not stored: it's derived from tasks, so it can never disagree with them.
-export interface OnboardingProfile {
-  employeeId: string
-  name: string
-  role: string
-  department: string
-  managerName: string
-  startDate: string       // ISO date, e.g. '2026-09-14'
-  location: string
-  tasks: { id: string; label: string; status: 'completed' | 'pending' }[]
-  _schemaVersion: 1
-}
+// The employee onboarding record (`employeeData/{uid}`) is typed in src/lib/onboarding.ts.
+// An escalation case (`escalationCases/{id}`) is written by
+// src/features/chatbot/lib/escalation.ts and read by src/actions/escalation.actions.ts.

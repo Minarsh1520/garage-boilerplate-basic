@@ -1,10 +1,9 @@
-// Repo convention: always the @/ alias, never ../../ more than one level.
 import { GEN_MODEL } from '@/lib/rag/config'
 import { searchPolicies, type RetrievedChunk } from '@/lib/rag/retrieve'
 import { withRetry } from '@/lib/rag/retry'
 import type { RagDeps } from '@/lib/rag/types'
-import type { AssistantReply, Pathway } from '../types'
-import { wasBlocked, buildPrompt, DECISION_JSON_SCHEMA, parseDecision, SYSTEM_PROMPT } from './decision'
+import type { AssistantReply, CaseCategory, Pathway } from '../types'
+import { buildPrompt, DECISION_JSON_SCHEMA, parseDecision, SYSTEM_PROMPT, wasBlocked } from './decision'
 import { atStage, classifyError } from './errors'
 import { formatRecord, readOwnRecord } from './record'
 import { matchSensitiveRule } from './rules'
@@ -14,7 +13,7 @@ import { matchSensitiveRule } from './rules'
 // as `deps`, so the Server Action AND scripts/probe-chat.ts can both run it.
 
 const NOT_FOUND_MESSAGE =
-    "There is currently no approved onboarding information I can use to answer that. Please contact HR for help with this question."
+    'There is currently no approved onboarding information I can use to answer that. I can send your question to the HR team if you would like.'
 const OFF_TOPIC_MESSAGE =
     'I can only help with questions about your onboarding, such as your checklist, leave, IT access and company policies.'
 const UNCLEAR_MESSAGE =
@@ -29,17 +28,23 @@ const SUGGESTED_QUESTIONS = [
 // The policies may well cover the topic; what's missing is THIS employee's own data.
 // Says "I can't see", not "you have none": the assistant doesn't know which it is.
 const RECORD_UNAVAILABLE_MESSAGE =
-  "I can't see any onboarding tasks or details on your record yet, so I can't confirm that. Please contact HR to check that your onboarding has been set up."
-// Guidance only. These never claim anything was sent or escalated (BA rule). When
-// escalation cases are saved (checklist item 8), the "send to HR" button is added here.
+  "I can't see any onboarding tasks or details on your record yet, so I can't confirm that. I can ask the HR team to check that your onboarding has been set up."
+// These OFFER to pass the matter on; they never claim it was sent (BA rule). A case is
+// only saved when the employee presses the button, in requestEscalation().
 const ESCALATION_MESSAGES: Record<Pathway, string> = {
-    HR: 'This needs to be handled by a person rather than the AI Assistant. Please contact HR directly for support.',
-    IT: 'This needs to be handled by a person rather than the AI Assistant. Please contact IT Support directly.',
-    Manager: 'This is a decision for your manager rather than the AI Assistant. Please speak with your manager directly.',
+    HR: 'This needs to be handled by a person rather than the AI Assistant. I can send it to the HR team if you would like.',
+    IT: 'This needs to be handled by a person rather than the AI Assistant. Please contact IT Support directly. I can also log it with the HR team if you would like.',
+    Manager: 'This is a decision for your manager rather than the AI Assistant. Please speak with your manager directly. I can also log it with the HR team if you would like.',
 }
 
 function reply(kind: AssistantReply['kind'], text: string, extra: Partial<AssistantReply> = {}): AssistantReply {
     return { kind, text, sources: [], ...extra }
+}
+
+// Every reply that hands the matter to a person carries an offer, which the chat window
+// shows as a "Send to HR team" button.
+function escalate(pathway: Pathway, category: CaseCategory): AssistantReply {
+    return reply('escalate', ESCALATION_MESSAGES[pathway], { pathway, escalationOffer: { category, pathway } })
 }
 
 // Each policy section is listed once, even if several of its chunks were retrieved.
@@ -67,7 +72,7 @@ export async function answerQuestion(
 
   // 1. Obvious sensitive matters → human, with zero model calls.
     const rule = matchSensitiveRule(question)
-    if (rule) return reply('escalate', ESCALATION_MESSAGES[rule.pathway], { pathway: rule.pathway, category: rule.category })
+    if (rule) return escalate(rule.pathway, rule.category)
 
     try {
     // 2. The policy search and the record lookup don't depend on each other, so they run in parallel.
@@ -99,7 +104,10 @@ export async function answerQuestion(
             },
         }), 2)
     )
-    if (wasBlocked(response)) return reply('escalate', ESCALATION_MESSAGES.HR, { pathway: 'HR', category: 'other' })
+    // A message Gemini refuses to process is, by definition, not one for the AI to handle.
+    // Send it to a person instead of telling the employee "no approved information".
+    if (wasBlocked(response)) return escalate('HR', 'other')
+
     const decision = parseDecision(response.text)
 
     // 4. CODE decides what each outcome means for the employee.
@@ -112,15 +120,13 @@ export async function answerQuestion(
             ? reply('fallback', UNCLEAR_MESSAGE, { suggestions: SUGGESTED_QUESTIONS })
             : reply('clarify', decision.text ?? '')
         case 'record_unavailable':
-            return reply('fallback', RECORD_UNAVAILABLE_MESSAGE)
+            return reply('fallback', RECORD_UNAVAILABLE_MESSAGE, { escalationOffer: { category: 'other', pathway: 'HR' } })
         case 'off_topic':
             return reply('fallback', OFF_TOPIC_MESSAGE)
-        case 'escalate': {
-            const pathway = decision.pathway ?? 'HR'
-            return reply('escalate', ESCALATION_MESSAGES[pathway], { pathway, category: decision.category ?? 'other' })
-        }
+        case 'escalate':
+            return escalate(decision.pathway ?? 'HR', decision.category ?? 'other')
         case 'not_found':
-            return reply('fallback', NOT_FOUND_MESSAGE)
+            return reply('fallback', NOT_FOUND_MESSAGE, { escalationOffer: { category: 'no-policy', pathway: 'HR' } })
         }
     } catch (error) {
         return errorReply(error)

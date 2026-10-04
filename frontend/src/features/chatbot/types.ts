@@ -17,6 +17,7 @@ export type EscalationCategory = (typeof ESCALATION_CATEGORIES)[number]
 // replies) is rebuilt and sent by the client on every turn, the server can't
 // tell a genuine past reply apart from someone forging one, so assistant
 // turns still need a real (just more generous) cap, not no cap at all.
+// One number for the server's limit AND the input box's limit, so they can't drift apart.
 export const MAX_QUESTION_LENGTH = 2000
 
 export const chatTurnSchema = z.discriminatedUnion('role', [
@@ -27,6 +28,18 @@ export const chatTurnSchema = z.discriminatedUnion('role', [
   z.object({ role: z.literal('assistant'), text: z.string().min(1).max(8000), kind: z.enum(ASSISTANT_KINDS).optional() }),
 ])
 
+// What a saved escalation case can be about: the model's categories, plus "no policy
+// covers this", which is the app's own reason for offering HR.
+export const CASE_CATEGORIES = [...ESCALATION_CATEGORIES, 'no-policy'] as const
+export type CaseCategory = (typeof CASE_CATEGORIES)[number]
+
+// What the chat window sends back when the employee presses "Send to HR team".
+export const requestEscalationSchema = z.object({
+  question: z.string().min(1).max(MAX_QUESTION_LENGTH),
+  category: z.enum(CASE_CATEGORIES),
+  pathway: z.enum(PATHWAYS),
+})
+
 export const sendChatMessageSchema = z.array(chatTurnSchema).min(1).max(50)
 
 export type ChatTurn = z.infer<typeof chatTurnSchema>
@@ -36,8 +49,10 @@ export interface AssistantReply {
   kind: AssistantMessageKind
   sources: { policyTitle: string; headingPath: string }[] // shown under answers
   pathway?: Pathway                // escalations only
-  category?: EscalationCategory    // escalations only
   errorCode?: string               // errors only, e.g. 'AI-503'. Shown to the employee and written in the log
   retryable?: boolean              // errors only: show a "Try again" button
   suggestions?: string[]           // ready-made questions shown as buttons
+  // Present when the employee may send this question to the HR team. Nothing is saved
+  // until they press the button: the offer alone creates no case.
+  escalationOffer?: { category: CaseCategory; pathway: Pathway }
 }

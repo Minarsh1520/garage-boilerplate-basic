@@ -6,20 +6,30 @@ import { Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { cn, formatDatetime } from '@/lib/utils'
-import { sendChatMessage } from '@/features/chatbot/actions/chatbot.actions'
+import { requestEscalation, sendChatMessage } from '@/features/chatbot/actions/chatbot.actions'
 import { toHistory } from '@/features/chatbot/lib/history'
-import { MAX_QUESTION_LENGTH, type AssistantMessageKind } from '@/features/chatbot/types'
+import {
+  MAX_QUESTION_LENGTH,
+  type AssistantMessageKind,
+  type AssistantReply,
+} from '@/features/chatbot/types'
 
 interface Message {
   id: string
   role: 'user' | 'assistant'
   text: string
   timestamp: Date
-  // The three below are only meaningful on assistant messages.
+  // Everything below is only meaningful on assistant messages.
   kind?: AssistantMessageKind
   retryable?: boolean      // error replies: show "Try again"
   suggestions?: string[]   // ready-made questions shown as buttons
+  // An offer to send the question to the HR team, with the question it refers to.
+  // Removed once the employee answers it, so it can't be sent twice.
+  offer?: NonNullable<AssistantReply['escalationOffer']> & { question: string }
 }
+
+// Shared look for the small buttons under a message.
+const CHIP_BUTTON = 'rounded-full border border-[#4361AB] px-3 py-1 text-left text-xs text-[#4361AB] disabled:opacity-50'
 
 export function ChatWindow() {
   const [messages, setMessages] = useState<Message[]>(() => [
@@ -30,6 +40,7 @@ export function ChatWindow() {
       timestamp: new Date(),
     },
   ])
+
   const [input, setInput] = useState('')
   const [isPending, setIsPending] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -38,10 +49,15 @@ export function ChatWindow() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isPending])
 
+  function addAssistantMessage(message: Omit<Message, 'id' | 'role' | 'timestamp'>) {
+    setMessages((prev) => [...prev, { ...message, id: crypto.randomUUID(), role: 'assistant', timestamp: new Date() }])
+  }
+
   // Takes the question as a parameter (instead of reading the input box) so the
   // "Try again" and suggested-question buttons can send through the same path.
   async function send(rawQuestion: string) {
     const question = rawQuestion.trim()
+
     if (!question || isPending) return
 
     const userMessage: Message = {
@@ -50,7 +66,9 @@ export function ChatWindow() {
       text: question,
       timestamp: new Date(),
     }
+
     const nextMessages = [...messages, userMessage]
+
     setMessages(nextMessages)
     setInput('')
     setIsPending(true)
@@ -64,26 +82,57 @@ export function ChatWindow() {
         return
       }
 
-      // Extracted to a local so TS's narrowing survives into the setState callback below —
-      // narrowing a property like `result.data` doesn't carry across closure boundaries.
       const reply = result.data
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          text: reply.text,
-          kind: reply.kind,
-          retryable: reply.retryable,
-          suggestions: reply.suggestions,
-          timestamp: new Date(),
-        },
-      ])
+      addAssistantMessage({
+        text: reply.text,
+        kind: reply.kind,
+        retryable: reply.retryable,
+        suggestions: reply.suggestions,
+        offer: reply.escalationOffer ? { ...reply.escalationOffer, question } : undefined,
+      })
+
+      // Lets the app tour move on once the first answer is on screen.
+      window.dispatchEvent(new Event('tour-response-ready'))
     } catch {
       // The request itself never reached the server or never came back (offline, timeout,
       // deploy in progress). Without this the spinner just stops with no explanation.
       toast.error('Could not reach the assistant. Check your connection and try again.')
+    } finally {
+      setIsPending(false)
+    }
+  }
+
+  // The offer is taken off the message whichever button is pressed, so it can be answered once only.
+  function closeOffer(messageId: string) {
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, offer: undefined } : m)))
+  }
+
+  // "Send to HR team": this is the ONLY thing that creates a case. What the employee is told
+  // afterwards comes from the result of the save, so it can't say "sent" when it wasn't.
+  async function acceptOffer(message: Message) {
+    if (!message.offer || isPending) return
+    const { question, category, pathway } = message.offer
+
+    closeOffer(message.id)
+    setIsPending(true)
+
+    try {
+      const result = await requestEscalation({ question, category, pathway })
+
+      if (result.success && result.data) {
+        addAssistantMessage({
+          kind: 'escalate',
+          text: `Your question has been sent to the HR team to review. Reference: ${result.data.caseId}`,
+        })
+      } else {
+        addAssistantMessage({
+          kind: 'error',
+          text: result.error ?? 'Your question could not be sent to the HR team. Please contact HR directly.',
+        })
+      }
+    } catch {
+      toast.error('Could not reach the server. Your question was not sent.')
     } finally {
       setIsPending(false)
     }
@@ -96,61 +145,87 @@ export function ChatWindow() {
     }
   }
 
-  // Buttons are only live on the LATEST message, so an old "Try again" can't resend a stale question.
+  // "Try again" and suggested questions are only live on the LATEST message, so an old
+  // button can't resend a stale question.
   const lastMessage = messages.at(-1)
   const lastQuestion = messages.filter((m) => m.role === 'user').at(-1)?.text
 
   return (
-    <div className="flex h-[70vh] flex-col rounded-lg border border-zinc-200 dark:border-zinc-800">
-      <div aria-live="polite" className="flex-1 space-y-4 overflow-y-auto p-4">
-        {messages.map((message) => {
+    <div className="flex h-full min-h-0 flex-col bg-white">
+      {/* Messages */}
+      <div
+        aria-live="polite"
+        className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-4 sm:space-y-5 sm:px-6 sm:py-5"
+      >
+        {messages.map((message, index) => {
           const isEscalation = message.role === 'assistant' && message.kind === 'escalate'
           const isError = message.role === 'assistant' && message.kind === 'error'
           const isLatest = message.id === lastMessage?.id
+
+          const isLatestAssistant =
+            message.role === 'assistant' &&
+            message.id !== 'greeting' &&
+            index === messages.length - 1
+
           return (
             <div
               key={message.id}
-              className={cn('flex flex-col', message.role === 'user' ? 'items-end' : 'items-start')}
+              className={cn(
+                'flex flex-col',
+                message.role === 'user'
+                  ? 'items-end'
+                  : 'items-start'
+              )}
             >
               <div
+                data-tour={
+                  isLatestAssistant
+                    ? 'assistant-response'
+                    : undefined
+                }
                 className={cn(
-                  // break-words: a long unbroken string (e.g. a link) wraps instead of overflowing the bubble.
-                  'max-w-[75%] rounded-lg px-3 py-2 text-sm break-words whitespace-pre-wrap',
+                  'max-w-[85%] break-words rounded-md px-3 py-2 text-sm whitespace-pre-wrap sm:max-w-[75%]',
                   message.role === 'user' &&
-                    'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900',
+                    'bg-zinc-200 text-[#222222]',
                   message.role === 'assistant' &&
                     !isEscalation &&
                     !isError &&
-                    'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100',
+                    'border border-[#4361AB] bg-[#E8F1F8] text-[#222222]',
                   isEscalation &&
-                    'border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100',
+                    'border border-amber-300 bg-amber-50 text-amber-900',
                   isError &&
-                    'border border-red-300 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-100'
+                    'border border-red-300 bg-red-50 text-red-900'
                 )}
               >
                 {message.text}
               </div>
 
+              {message.offer && (
+                <div className="mt-2 flex max-w-[85%] flex-wrap gap-2 sm:max-w-[75%]">
+                  <button type="button" onClick={() => void acceptOffer(message)} disabled={isPending} className={CHIP_BUTTON}>
+                    Send to HR team
+                  </button>
+                  <button type="button" onClick={() => closeOffer(message.id)} disabled={isPending} className={CHIP_BUTTON}>
+                    No thanks
+                  </button>
+                </div>
+              )}
+
               {isLatest && isError && message.retryable && lastQuestion && (
-                <button
-                  type="button"
-                  onClick={() => void send(lastQuestion)}
-                  disabled={isPending}
-                  className="mt-2 rounded-md border border-zinc-300 px-3 py-1 text-xs disabled:opacity-50 dark:border-zinc-700"
-                >
+                <button type="button" onClick={() => void send(lastQuestion)} disabled={isPending} className={cn(CHIP_BUTTON, 'mt-2')}>
                   Try again
                 </button>
               )}
 
               {isLatest && message.suggestions && message.suggestions.length > 0 && (
-                <div className="mt-2 flex max-w-[75%] flex-wrap gap-2">
+                <div className="mt-2 flex max-w-[85%] flex-wrap gap-2 sm:max-w-[75%]">
                   {message.suggestions.map((suggestion) => (
                     <button
                       key={suggestion}
                       type="button"
                       onClick={() => void send(suggestion)}
                       disabled={isPending}
-                      className="rounded-full border border-zinc-300 px-3 py-1 text-left text-xs disabled:opacity-50 dark:border-zinc-700"
+                      className={CHIP_BUTTON}
                     >
                       {suggestion}
                     </button>
@@ -158,43 +233,69 @@ export function ChatWindow() {
                 </div>
               )}
 
-              <span className="mt-1 text-xs text-zinc-400">{formatDatetime(message.timestamp)}</span>
+              <span className="mt-1 text-[10px] text-zinc-500 sm:text-xs">
+                {formatDatetime(message.timestamp)}
+              </span>
             </div>
           )
         })}
 
-        {isPending && (
-          <div className="flex items-start">
-            <div className="flex items-center rounded-lg bg-zinc-100 px-3 py-2 dark:bg-zinc-800">
-              <LoadingSpinner size="sm" />
-            </div>
-          </div>
-        )}
-
         <div ref={bottomRef} />
       </div>
 
-      <div className="flex items-center gap-2 border-t border-zinc-200 p-3 dark:border-zinc-800">
-        <input
-          type="text"
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={isPending}
-          maxLength={MAX_QUESTION_LENGTH}
-          placeholder="Ask...."
-          aria-label="Message"
-          className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900"
-        />
-        <button
-          type="button"
-          onClick={() => void send(input)}
-          disabled={isPending || !input.trim()}
-          aria-label="Send message"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+      <div className="shrink-0 px-3 pb-3 sm:px-6 sm:pb-4">
+        <div
+          data-tour="chat-input"
+          className="relative flex items-center gap-2 rounded-full border border-[#4361AB] bg-[#DDE8F2] p-1"
         >
-          <Send className="h-4 w-4" />
-        </button>
+          <div className="relative min-w-0 flex-1">
+            <input
+              type="text"
+              value={input}
+              onChange={(event) =>
+                setInput(event.target.value)
+              }
+              onKeyDown={handleKeyDown}
+              disabled={isPending}
+              // Same limit the server enforces, so an over-long question can't be typed at all.
+              maxLength={MAX_QUESTION_LENGTH}
+              placeholder="Ask...."
+              aria-label="Message"
+              className="
+                w-full bg-transparent
+                px-3 py-2 pr-10
+                text-sm text-[#222222]
+                placeholder:text-[#4361AB]
+                outline-none
+                disabled:opacity-50
+                sm:px-4
+              "
+            />
+
+            {isPending && (
+              <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                <LoadingSpinner size="sm" />
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void send(input)}
+            disabled={isPending || !input.trim()}
+            aria-label="Send message"
+            className="
+              flex h-9 w-9 shrink-0
+              items-center justify-center
+              rounded-full
+              bg-[#4361AB]
+              text-white
+              disabled:opacity-50
+            "
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   )

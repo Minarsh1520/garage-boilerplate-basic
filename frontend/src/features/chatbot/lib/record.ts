@@ -1,17 +1,26 @@
 import { z } from 'zod'
 import type { RagDeps } from '@/lib/rag/types'
 
-// The record is validated like user input (same idea as chunkSchema in retrieve.ts):
-// a record seeded with a different shape, or edited by hand, must not crash the chat.
+// The employee record lives in `employeeData/{uid}`. Its shape is owned by
+// src/lib/onboarding.ts (EmployeeOnboarding), which the Home page checklist also reads,
+// so the chat and the checklist can never show different data.
+// That helper isn't called here because it imports the Next.js-only Admin connection;
+// this file takes `deps` so the probe script and the unit tests can run it too.
+export const EMPLOYEE_COLLECTION = 'employeeData'
+
+// Validated like user input (same idea as chunkSchema in retrieve.ts): a record created
+// with a different shape, or edited by hand, must not crash the chat.
 // Every field is optional so ONE missing part doesn't throw away the rest.
 const recordSchema = z.object({
     employeeId: z.string().optional(),
-    name: z.string().optional(),
-    role: z.string().optional(),
+    employeeName: z.string().optional(),
+    jobTitle: z.string().optional(),
     department: z.string().optional(),
-    managerName: z.string().optional(),
+    manager: z.string().optional(),
     startDate: z.string().optional(),
-    tasks: z.array(z.object({ label: z.string(), status: z.enum(['completed', 'pending']) })).optional(),
+    checklist: z
+        .array(z.object({ title: z.string(), status: z.enum(['completed', 'pending']), duein: z.string().optional() }))
+        .optional(),
 })
 export type EmployeeRecord = z.infer<typeof recordSchema>
 
@@ -22,13 +31,13 @@ export type RecordResult =
 
 // Only ever the SIGNED-IN user's record: the uid comes from the verified session,
 // never from the question, so no one can request another employee's data.
-export async function readOwnRecord(deps: RagDeps, uid: string): Promise<RecordResult> {
-    const snapshot = await deps.db.doc(`onboardingProfiles/${uid}`).get()
+export async function readOwnRecord(deps: Pick<RagDeps, 'db'>, uid: string): Promise<RecordResult> {
+    const snapshot = await deps.db.doc(`${EMPLOYEE_COLLECTION}/${uid}`).get()
     if (!snapshot.exists) return { status: 'missing' }
     const parsed = recordSchema.safeParse(snapshot.data())
     if (!parsed.success) {
         // Field names only, never the values: this is employee data going into a log.
-        console.error(`[chat] onboarding record for ${uid} is malformed:`, parsed.error.issues.map((i) => i.path.join('.')))
+        console.error(`[chat] employee record for ${uid} is malformed:`, parsed.error.issues.map((i) => i.path.join('.')))
         return { status: 'malformed' }
     }
     return { status: 'ok', record: parsed.data }
@@ -39,13 +48,18 @@ const UNKNOWN = 'not available'
 // Only the fields an answer might need (minimum necessary employee data).
 // A missing part is written as "not available", NOT left out or defaulted to empty:
 // an empty task list would read to the model as "nothing outstanding".
+// The record's separate status fields (itAccountStatus, mandatoryTrainingStatus,
+// onboardingStatus) are deliberately not sent: they repeat the checklist, and if the two
+// ever disagree the model would have no way to know which is right.
 export function formatRecord(record: EmployeeRecord): string {
-    const tasks = record.tasks?.length ? '\n' + record.tasks.map((t) => `- ${t.label}: ${t.status}`).join('\n') : ` ${UNKNOWN}`
+    const tasks = record.checklist?.length
+        ? '\n' + record.checklist.map((t) => `- ${t.title}: ${t.status}${t.duein ? ` (due: ${t.duein})` : ''}`).join('\n')
+        : ` ${UNKNOWN}`
     return [
-        `Name: ${record.name ?? UNKNOWN}`,
-        `Role: ${record.role ?? UNKNOWN}`,
+        `Name: ${record.employeeName ?? UNKNOWN}`,
+        `Role: ${record.jobTitle ?? UNKNOWN}`,
         `Department: ${record.department ?? UNKNOWN}`,
-        `Manager: ${record.managerName ?? UNKNOWN}`,
+        `Manager: ${record.manager ?? UNKNOWN}`,
         `Start date: ${record.startDate ?? UNKNOWN}`,
         `Onboarding tasks:${tasks}`,
     ].join('\n')

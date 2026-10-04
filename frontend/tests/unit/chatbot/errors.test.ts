@@ -28,7 +28,7 @@ describe('classifyError', () => {
     })
 
     it('never puts the raw error text in the employee message', () => {
-        const classified = classifyError(new StageError('record', new Error('permission denied on onboardingProfiles/abc')))
-        expect(classified.userMessage).not.toContain('onboardingProfiles')
+        const classified = classifyError(new StageError('record', new Error('permission denied on employeeData/abc')))
+        expect(classified.userMessage).not.toContain('employeeData')
     })
 })

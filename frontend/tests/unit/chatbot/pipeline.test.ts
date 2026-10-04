@@ -4,8 +4,8 @@ import type { RagDeps } from '@/lib/rag/types'
 import { answerQuestion } from '@/features/chatbot/lib/pipeline'
 
 const ALEX = {
-    name: 'Alex Chen',
-    tasks: [{ label: 'Super Fund Nomination', status: 'pending' }],
+    employeeName: 'Alex Chen',
+    checklist: [{ title: 'Super Fund Nomination', status: 'pending' }],
     }
     const CHUNK = { policyId: 'leave-policy', policyTitle: 'Leave Policy', chunkIndex: 0, headingPath: 'Leave Policy > Approval process', text: 'Your manager approves leave.' }
 
@@ -39,7 +39,7 @@ const ALEX = {
     it('escalates a sensitive question without calling the model', async () => {
         const { deps, generateContent } = fakeDeps({})
         const reply = await ask(deps, 'I want to make a complaint')
-        expect(reply).toMatchObject({ kind: 'escalate', pathway: 'HR', category: 'complaint' })
+        expect(reply).toMatchObject({ kind: 'escalate', pathway: 'HR', escalationOffer: { category: 'complaint', pathway: 'HR' } })
         expect(generateContent).not.toHaveBeenCalled()
     })
 
@@ -69,6 +69,14 @@ const ALEX = {
         expect(await ask(deps, 'My laptop was stolen')).toMatchObject({ kind: 'escalate', pathway: 'IT' })
     })
 
+    it('offers to send a not-found question to HR, and offers nothing for off-topic', async () => {
+        const notFound = fakeDeps({ decision: { outcome: 'not_found' } })
+        expect((await ask(notFound.deps, 'Who is my buddy?')).escalationOffer).toEqual({ category: 'no-policy', pathway: 'HR' })
+
+        const offTopic = fakeDeps({ decision: { outcome: 'off_topic' } })
+        expect((await ask(offTopic.deps, 'Recommend a pasta recipe')).escalationOffer).toBeUndefined()
+    })
+
     it('never claims anything was sent or recorded', async () => {
         const { deps } = fakeDeps({ decision: { outcome: 'escalate' } })
         const reply = await ask(deps, 'I feel overwhelmed')
@@ -95,7 +103,7 @@ const ALEX = {
     })
 
     it('survives a record with no task list', async () => {
-        const { deps, generateContent } = fakeDeps({ record: { name: 'Alex Chen' }, decision: { outcome: 'not_found' } })
+        const { deps, generateContent } = fakeDeps({ record: { employeeName: 'Alex Chen' }, decision: { outcome: 'not_found' } })
         expect((await ask(deps, 'What tasks are left?')).kind).toBe('fallback')
         const prompt = (generateContent.mock.calls[0] as unknown as [{ contents: string }])[0].contents
         expect(prompt).toContain('Onboarding tasks: not available')
@@ -109,7 +117,7 @@ const ALEX = {
         expect(reply.text).not.toContain('models/x')
     })
     it('tells an employee with no tasks on record that it cannot confirm, not that no policy exists', async () => {
-    const { deps } = fakeDeps({ record: { name: 'New Starter' }, decision: { outcome: 'record_unavailable' } })
+    const { deps } = fakeDeps({ record: { employeeName: 'New Starter' }, decision: { outcome: 'record_unavailable' } })
     const reply = await ask(deps, 'What tasks are left?')
     expect(reply.kind).toBe('fallback')
     expect(reply.text).toMatch(/on your record/)
