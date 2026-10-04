@@ -19,8 +19,11 @@ export function chunkMarkdown(markdown: string): Chunk[] {
         if (body) sections.push({ headingPath: path.join(' > '), body })
         buffer = []
     }
+    // HTML comments are notes for maintainers (e.g. "placeholder file"), not policy text:
+    // removed here so they are never embedded or shown to an employee.
+    const content = markdown.replace(/<!--[\s\S]*?-->/g, '')
 
-    for (const line of markdown.split('\n')) {
+    for (const line of content.split(/\r?\n/)) {
         const heading = /^(#{1,3})\s+(.+)$/.exec(line)
         if (heading?.[1] && heading[2]) {
         flush()
