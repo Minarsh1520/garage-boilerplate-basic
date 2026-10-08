@@ -64,6 +64,12 @@ const defaultChecklist: ChecklistSelection[] = [
   { templateId: 'company-policies', dueDays: 1 },
 ]
 
+function addDays(startDate: string, days: number) {
+  const date = new Date(`${startDate}T00:00:00Z`)
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
 export async function addEmployee(
   input: AddEmployeeInput
 ): Promise<EmployeeActionResult> {
@@ -111,6 +117,7 @@ export async function addEmployee(
         ...template,
         status: 'pending',
         duein: `${dueDays} Days`,
+        dueDate: addDays(input.startDate, dueDays),
       }
     })
 

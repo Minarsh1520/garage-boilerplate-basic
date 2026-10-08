@@ -6,6 +6,7 @@ export interface OnboardingChecklistItem {
   description: string
   status: 'completed' | 'pending'
   duein: string
+  dueDate?: string
 }
 
 export interface EmployeeOnboarding {

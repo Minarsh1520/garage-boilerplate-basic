@@ -29,7 +29,7 @@ const adminNavItems = [
     icon: Users,
   },
   {
-    href: '/chatbot',
+    href: '/admin/assistant',
     label: 'Assistant',
     icon: BotMessageSquare,
   },
