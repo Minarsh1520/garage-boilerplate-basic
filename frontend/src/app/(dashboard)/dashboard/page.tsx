@@ -10,20 +10,48 @@ export const metadata: Metadata = {
 
 export default async function DashboardPage() {
   const session = await getServerSession()
-  const onboarding = session ? await getEmployeeOnboarding(session.uid) : null
-  const profileSnap = session ? await adminDb.collection('users').doc(session.uid).get() : null
+
+  const onboarding = session
+    ? await getEmployeeOnboarding(session.uid)
+    : null
+
+  const profileSnap = session
+    ? await adminDb.collection('users').doc(session.uid).get()
+    : null
 
   const displayName = profileSnap?.exists
     ? (profileSnap.data()?.displayName as string | null)
     : null
-  const greetingName = displayName ?? session?.email ?? null
+
+  const greetingName =
+    onboarding?.employeeName ??
+    displayName ??
+    session?.email ??
+    'Employee'
+
+  const totalTasks = onboarding?.checklist.length ?? 0
+
+  const completedTasks =
+    onboarding?.checklist.filter(
+      (item) => item.status === 'completed'
+    ).length ?? 0
+
+  const progress =
+    totalTasks > 0
+      ? Math.round((completedTasks / totalTasks) * 100)
+      : 0
 
   return (
-    <div className="space-y-4 px-6 py-5">
+    <div className="space-y-5 px-4 py-5 sm:px-6">
+      {/* Heading */}
       <div>
-        <h1 className="text-4xl font-bold tracking-tight text-[#222222]">
+        <h1 className="text-3xl font-bold tracking-tight text-[#222222] sm:text-4xl">
           Home
         </h1>
+
+        <p className="mt-1 text-base font-medium text-[#222222]">
+          Welcome, {greetingName}
+        </p>
 
         <p className="mt-1 text-sm text-[#222222]">
           Need Help? Interact with our{' '}
@@ -37,7 +65,37 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <div data-tour="checklist" className="relative">
+      {/* Progress */}
+      {onboarding && totalTasks > 0 && (
+        <div className="max-full">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-[#222222]">
+              Onboarding Progress
+            </h2>
+
+            <span className="text-sm font-semibold text-[#4361AB]">
+              {progress}%
+            </span>
+          </div>
+
+          <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-zinc-200">
+            <div
+              className="h-full rounded-full bg-[#4361AB] transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+
+          <p className="mt-2 text-sm text-zinc-600">
+            {completedTasks} of {totalTasks} tasks completed
+          </p>
+        </div>
+      )}
+
+      {/* Checklist */}
+      <div
+        data-tour="checklist"
+        className="relative"
+      >
         <h2 className="text-2xl font-bold text-[#222222]">
           Checklist
         </h2>
@@ -51,10 +109,17 @@ export default async function DashboardPage() {
             {onboarding.checklist.map((item, index) => (
               <div
                 key={item.id}
-                className="flex items-start justify-between border-b border-zinc-500 py-3 px-1"
+                className="flex items-start justify-between gap-4 border-b border-zinc-500 px-1 py-3"
               >
-                <div data-tour={index === 0 ? 'task-details' : undefined} className="relative">
-                  <p className="text-xl font-medium text-[#222222]">
+                <div
+                  data-tour={
+                    index === 0
+                      ? 'task-details'
+                      : undefined
+                  }
+                  className="relative min-w-0"
+                >
+                  <p className="text-lg font-medium text-[#222222] sm:text-xl">
                     {item.title}
                   </p>
 
@@ -63,7 +128,14 @@ export default async function DashboardPage() {
                   </p>
                 </div>
 
-                <div data-tour={index === 0 ? 'task-status' : undefined} className="relative text-right">
+                <div
+                  data-tour={
+                    index === 0
+                      ? 'task-status'
+                      : undefined
+                  }
+                  className="relative shrink-0 text-right"
+                >
                   <p className="text-xs font-bold text-[#4361AB]">
                     {item.status.toUpperCase()}
                   </p>

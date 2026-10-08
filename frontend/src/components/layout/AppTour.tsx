@@ -791,7 +791,7 @@ export function AppTour() {
               }}
               className="mt-4 rounded-md bg-[#4361AB] px-4 py-2 font-bold text-white hover:bg-[#3B579A]"
             >
-              RETURN TO HOME
+              FINISH
             </button>
           </div>
         </div>
