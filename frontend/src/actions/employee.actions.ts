@@ -70,6 +70,27 @@ function addDays(startDate: string, days: number) {
   return date.toISOString().slice(0, 10)
 }
 
+async function calculateNextEmployeeId() {
+  const [active, pending] = await Promise.all([
+    adminDb.collection('employeeData').get(),
+    adminDb.collection('pendingEmployees').get(),
+  ])
+
+  const ids = [...active.docs, ...pending.docs]
+    .map((doc) => String(doc.data().employeeId ?? ''))
+    .map((id) => id.match(/^EMP(\d+)$/i))
+    .filter((match): match is RegExpMatchArray => match !== null)
+    .map((match) => Number(match[1]))
+
+  const next = ids.length ? Math.max(...ids) + 1 : 1
+  return `EMP${String(next).padStart(3, '0')}`
+}
+
+export async function getNextEmployeeId() {
+  await requireAdmin()
+  return calculateNextEmployeeId()
+}
+
 export async function addEmployee(
   input: AddEmployeeInput
 ): Promise<EmployeeActionResult> {
@@ -77,11 +98,11 @@ export async function addEmployee(
     await requireAdmin()
 
     const email = input.email.trim().toLowerCase()
+    const employeeId = await calculateNextEmployeeId()
 
     if (
       !email ||
       !input.employeeName.trim() ||
-      !input.employeeId.trim() ||
       !input.jobTitle.trim() ||
       !input.department.trim() ||
       !input.manager.trim() ||
@@ -124,7 +145,7 @@ export async function addEmployee(
     await adminDb.collection('pendingEmployees').add({
       email,
       employeeName: input.employeeName.trim(),
-      employeeId: input.employeeId.trim(),
+      employeeId,
       jobTitle: input.jobTitle.trim(),
       department: input.department.trim(),
       manager: input.manager.trim(),

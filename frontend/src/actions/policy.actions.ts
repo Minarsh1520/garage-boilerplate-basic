@@ -19,43 +19,28 @@ export async function uploadPolicyDocument(
   try {
     const session = await requireAdmin()
 
-    if (!fileName || !fileData) {
-      return {
-        success: false,
-        error: 'No file was provided.',
-      }
-    }
+    if (!fileName || !fileData) return { success: false, error: 'No file was provided.' }
 
     if (fileType !== 'application/pdf' && !fileName.toLowerCase().endsWith('.pdf')) {
-      return {
-        success: false,
-        error: 'Only PDF files are supported.',
-      }
+      return { success: false, error: 'Only PDF files are supported.' }
     }
 
-    if (fileSize > MAX_FILE_SIZE) {
-      return {
-        success: false,
-        error: 'PDF must be 500 KB or smaller.',
-      }
-    }
-    
+    if (fileSize > MAX_FILE_SIZE) return { success: false, error: 'PDF must be 500 KB or smaller.' }
+
     await adminDb.collection('policyDocuments').add({
       fileName,
       fileType,
       fileSize,
       fileData,
+      source: 'policy',
+      chatbotReadable: true,
+      status: 'active',
       uploadedBy: session.uid,
       uploadedAt: new Date(),
     })
 
-    return {
-      success: true,
-    }
+    return { success: true }
   } catch {
-    return {
-      success: false,
-      error: 'Failed to upload policy document.',
-    }
+    return { success: false, error: 'Failed to upload policy document.' }
   }
 }

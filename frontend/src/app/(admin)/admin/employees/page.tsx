@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, type ChangeEvent } from 'react'
-import { addEmployee } from '@/actions/employee.actions'
+import { addEmployee, getNextEmployeeId } from '@/actions/employee.actions'
 import { assignTaskFromTemplate, createCustomTaskAndAssign, getEmployeeOptions, getEmployeeTasks, getTaskTemplates, removePendingTask, type DefaultTaskTemplateId, type EmployeeOption, type EmployeeTask, type TaskTemplateOption } from '@/actions/task.actions'
 
 const defaultTasks: { id: DefaultTaskTemplateId; label: string }[] = [
@@ -53,9 +53,13 @@ export default function EmployeesPage() {
   const taskEmail = selectionMode === 'existing' ? selectedEmail : manualEmail.trim()
 
   useEffect(() => {
-    Promise.all([getEmployeeOptions(), getTaskTemplates()])
-      .then(([employeeList, templateList]) => { setEmployees(employeeList); setTemplates(templateList) })
-      .catch(() => setTaskError('Failed to load employee task data.'))
+    Promise.all([getEmployeeOptions(), getTaskTemplates(), getNextEmployeeId()])
+      .then(([employeeList, templateList, nextId]) => {
+        setEmployees(employeeList)
+        setTemplates(templateList)
+        setForm((current) => ({ ...current, employeeId: nextId }))
+      })
+      .catch(() => setTaskError('Failed to load employee data.'))
   }, [])
 
   useEffect(() => {
@@ -86,10 +90,20 @@ export default function EmployeesPage() {
 
     if (result.success) {
       setAddSuccess('Employee added successfully.')
-      setForm(emptyForm)
       setNewEmployeeTasks(defaultNewEmployeeTasks)
-      try { setEmployees(await getEmployeeOptions()) } catch {}
-    } else setAddError(result.error ?? 'Failed to add employee.')
+
+      try {
+        const [employeeList, nextId] = await Promise.all([
+          getEmployeeOptions(),
+          getNextEmployeeId(),
+        ])
+
+        setEmployees(employeeList)
+        setForm({ ...emptyForm, employeeId: nextId })
+      } catch {
+        setForm(emptyForm)
+      }
+    }
 
     setAddingEmployee(false)
   }
@@ -162,7 +176,7 @@ export default function EmployeesPage() {
 
             <div>
               <label htmlFor="employeeId" className="text-sm font-semibold text-[#222222]">Employee ID</label>
-              <input id="employeeId" name="employeeId" value={form.employeeId} onChange={handleChange} placeholder="EMP001" className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-[#222222] outline-none focus:border-[#4361AB]" />
+              <input id="employeeId" name="employeeId" value={form.employeeId} readOnly className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-[#222222] outline-none focus:border-[#4361AB]" />
             </div>
 
             <div>
