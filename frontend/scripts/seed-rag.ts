@@ -8,8 +8,10 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { initializeApp, cert } from 'firebase-admin/app'
 import { FieldValue, getFirestore } from 'firebase-admin/firestore'
-import { GoogleGenAI } from '@google/genai'
-import { ingestPolicy } from '../src/lib/rag/ingest'
+import { createGeminiPoolFromEnv } from '../src/lib/rag/gemini-pool'
+import { FAQ_COLLECTION, saveFaq } from '../src/lib/rag/faq'
+import { markdownToForm } from '../src/lib/rag/policy-sources'
+import { publishPolicy } from '../src/lib/rag/publish'
 import { getAuth } from 'firebase-admin/auth'
 import type { App } from 'firebase-admin/app'
 import { EMPLOYEE_COLLECTION } from '../src/features/chatbot/lib/record'
@@ -92,6 +94,35 @@ async function ensureDemoUser(app: App, email: string, displayName: string): Pro
 
 // A policy file must have exactly ONE top-level heading: that heading is the title
 // employees see as the source. Stops a stray "# note" line silently becoming the title.
+// Drafts written from the seed policies. Each answer only repeats what its policy says.
+const STARTER_FAQS = [
+    {
+        question: 'How do I request leave?',
+        answer: 'Submit your leave request in the Employee Portal under My Leave. For planned annual leave, submit it at least two weeks before the first day of leave. Your manager reviews it, usually within three business days.',
+        policyTitle: 'Leave Policy',
+    },
+    {
+        question: 'What should I do if I am running late?',
+        answer: 'Message your manager before 9:30 am to let them know you are running late.',
+        policyTitle: 'Workplace & Attendance Policy',
+    },
+    {
+        question: 'What should I do if I am sick and cannot come to work?',
+        answer: 'Notify your manager before your usual start time, by phone or team chat, and then submit personal leave in the Employee Portal.',
+        policyTitle: 'Workplace & Attendance Policy',
+    },
+    {
+        question: 'When do I need to complete mandatory training?',
+        answer: 'Mandatory training is three online modules in the Learning Hub. The Workplace Health and Safety (WHS) Induction must be completed before your first day. The other two, Privacy and Information Security and Respect at Work, are due within 30 days of your start date.',
+        policyTitle: 'New Employee Onboarding Guide',
+    },
+    {
+        question: 'How do I set up my IT account?',
+        answer: 'Your IT account is activated at the IT setup session at 10:00 am on your first day. For help, contact the IT Service Desk at itsupport@northbridge.example or 03 9000 1300.',
+        policyTitle: 'IT & System Access Guide',
+    },
+]
+
 function readPolicyTitle(file: string, markdown: string): string {
     const titles = [...markdown.matchAll(/^#\s+(.+)$/gm)].map((match) => match[1]?.trim())
     if (titles.length !== 1 || !titles[0]) {
@@ -109,17 +140,25 @@ async function main() {
     })
 
     // 2. Gemini + Firestore dependencies for ingestion.
-    const deps = { ai: new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }), db: getFirestore(app) }
+    const deps = { ai: createGeminiPoolFromEnv(), db: getFirestore(app) }
 
+    // Published the same way as the Admin page does, so the seed policies show up in the
+    // Policy page list too and can be edited there. The id stays the file name, as before,
+    // so re-seeding replaces the existing chunks instead of adding a second copy.
     for (const file of readdirSync('seed/policies').filter((f) => f.endsWith('.md'))) {
         const markdown = readFileSync(`seed/policies/${file}`, 'utf8')
-        const policyTitle = readPolicyTitle(file, markdown)
-        const { chunkCount } = await ingestPolicy(deps, {
-        policyId: file.replace(/\.md$/, ''),
-        policyTitle,
-        markdown,
-        })
-        console.info(`${file}: ${chunkCount} chunks`)
+        readPolicyTitle(file, markdown) // fails loudly on a file without exactly one "# Title"
+        const policyId = file.replace(/\.md$/, '')
+        const result = await publishPolicy(deps, { form: markdownToForm(markdown), source: 'seed', uid: 'seed-script', policyId })
+        if (result.status === 'failed') throw new Error(`${file}: publishing failed (see the error above)`)
+        console.info(`${file}: ${result.chunkCount} chunks`)
+    }
+
+    // Starter stored answers, ONLY when there are none yet, so HR's own edits are never
+    // overwritten. Added switched OFF: HR reads and approves each one on the Admin page first.
+    if ((await deps.db.collection(FAQ_COLLECTION).limit(1).get()).empty) {
+        for (const faq of STARTER_FAQS) await saveFaq(deps, { ...faq, active: false, savedBy: 'seed-script' })
+        console.info(`Added ${STARTER_FAQS.length} starter stored answers (switched off until HR approves them)`)
     }
 
     // 3. One login + one onboarding record per demo employee. Document ID = Auth uid.
