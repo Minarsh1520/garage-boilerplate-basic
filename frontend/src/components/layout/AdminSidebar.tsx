@@ -5,6 +5,7 @@ import {
   CircleHelp,
   Users,
   BotMessageSquare,
+  MessageSquareText,
 } from 'lucide-react'
 
 const adminNavItems = [
@@ -17,6 +18,11 @@ const adminNavItems = [
     href: '/admin/policy',
     label: 'Policy',
     icon: FileText,
+  },
+  {
+    href: '/admin/faq',
+    label: 'Stored Answers',
+    icon: MessageSquareText,
   },
   {
     href: '/admin/cases',

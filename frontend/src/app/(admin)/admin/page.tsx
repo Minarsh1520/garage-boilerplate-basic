@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { FileText, CircleHelp, Users } from 'lucide-react'
+import { FileText, CircleHelp, Users, MessageSquareText } from 'lucide-react'
 
 const adminCards = [
   {
@@ -7,6 +7,12 @@ const adminCards = [
     description: 'Provide approved documents for the AI assistant to use',
     href: '/admin/policy',
     icon: FileText,
+  },
+  {
+    title: 'Stored Answers',
+    description: 'Approved answers to common questions, shown by the assistant word for word',
+    href: '/admin/faq',
+    icon: MessageSquareText,
   },
   {
     title: 'Escalation Cases',

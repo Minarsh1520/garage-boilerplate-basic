@@ -5,8 +5,8 @@ import type { ActionResult } from '@/types'
 import { getRagDeps } from '@/lib/rag/server'
 import type { RagDeps } from '@/lib/rag/types'
 import { adminDb } from '@/lib/firebase/admin'
-import { MAX_QUESTION_LENGTH, requestEscalationSchema, sendChatMessageSchema, type AssistantReply } from '@/features/chatbot/types'
-import { createEscalationCase } from '@/features/chatbot/lib/escalation'
+import { MAX_QUESTION_LENGTH, requestEscalationSchema, sendChatMessageSchema, sendChatOptionsSchema, type AssistantReply } from '@/features/chatbot/types'
+import { createEscalationCase, MAX_CASES_PER_DAY } from '@/features/chatbot/lib/escalation'
 import { StageError } from '@/features/chatbot/lib/errors'
 import { pickQuestion } from '@/features/chatbot/lib/history'
 import { answerQuestion, errorReply } from '@/features/chatbot/lib/pipeline'
@@ -14,7 +14,7 @@ import { matchSensitiveRule } from '@/features/chatbot/lib/rules'
 
 // Thin wrapper: who is asking, and what did they ask. All the answering logic lives in
 // lib/pipeline.ts so it can be tested and probed without Next.js.
-export async function sendChatMessage(history: unknown): Promise<ActionResult<AssistantReply>> {
+export async function sendChatMessage(history: unknown, options?: unknown): Promise<ActionResult<AssistantReply>> {
   const session = await requireAuth()
 
   const parsed = sendChatMessageSchema.safeParse(history)
@@ -37,12 +37,15 @@ export async function sendChatMessage(history: unknown): Promise<ActionResult<As
     return { success: true, data: errorReply(new StageError('setup', error)) }
   }
 
-  return { success: true, data: await answerQuestion(deps, { uid: session.uid, question, earlierQuestion }) }
+  // Bad options are ignored rather than rejected: the worst case is the stored answer is shown.
+  const skipFaq = sendChatOptionsSchema.safeParse(options).data?.skipFaq
+
+  return { success: true, data: await answerQuestion(deps, { uid: session.uid, question, earlierQuestion, skipFaq }) }
 }
 
 // Called when the employee presses "Send to HR team". This is the only way a case is
 // created, so the chat can never claim something was sent when it wasn't.
-export async function requestEscalation(input: unknown): Promise<ActionResult<{ caseId: string }>> {
+export async function requestEscalation(input: unknown): Promise<ActionResult<{ caseId: string; alreadySent?: boolean }>> {
   // WHO is asking comes from the session, never from what the browser sent.
   const session = await requireAuth()
 
@@ -57,8 +60,19 @@ export async function requestEscalation(input: unknown): Promise<ActionResult<{ 
   const pathway = rule?.pathway ?? parsed.data.pathway
 
   try {
-    const caseId = await createEscalationCase({ db: adminDb }, { uid: session.uid, question, category, pathway })
-    return { success: true, data: { caseId } }
+    const result = await createEscalationCase({ db: adminDb }, { uid: session.uid, question, category, pathway })
+    switch (result.status) {
+      case 'created':
+        return { success: true, data: { caseId: result.caseId } }
+      // Already sent: give the same reference again instead of making a second case.
+      case 'duplicate':
+        return { success: true, data: { caseId: result.caseId, alreadySent: true } }
+      case 'daily-limit':
+        return {
+          success: false,
+          error: `You have sent ${MAX_CASES_PER_DAY} questions to the HR team today, which is the daily limit. The HR team will reply to those first. If this is urgent, please contact HR directly.`,
+        }
+    }
   } catch (error) {
     // Full detail stays in the server log (SECURITY.md); the employee is told it was NOT sent.
     console.error('[chat] DB-ESCALATION side=app stage=escalation', error)

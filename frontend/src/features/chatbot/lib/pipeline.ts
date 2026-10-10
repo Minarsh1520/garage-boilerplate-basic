@@ -1,4 +1,6 @@
 import { GEN_MODEL } from '@/lib/rag/config'
+import { embedText } from '@/lib/rag/embed'
+import { matchFaq } from '@/lib/rag/faq'
 import { searchPolicies, type RetrievedChunk } from '@/lib/rag/retrieve'
 import { withRetry } from '@/lib/rag/retry'
 import type { RagDeps } from '@/lib/rag/types'
@@ -66,20 +68,39 @@ export function errorReply(error: unknown): AssistantReply {
 
 export async function answerQuestion(
     deps: RagDeps,
-    input: { uid: string; question: string; earlierQuestion?: string }
+    input: { uid: string; question: string; earlierQuestion?: string; skipFaq?: boolean }
 ): Promise<AssistantReply> {
-    const { uid, question, earlierQuestion } = input
+    const { uid, question, earlierQuestion, skipFaq } = input
 
   // 1. Obvious sensitive matters → human, with zero model calls.
     const rule = matchSensitiveRule(question)
     if (rule) return escalate(rule.pathway, rule.category)
 
     try {
-    // 2. The policy search and the record lookup don't depend on each other, so they run in parallel.
-    //    A follow-up is searched together with the question it follows up on.
+    // 2. Embed the question ONCE. The same vector is used for the stored-answer check and
+    //    the policy search. A follow-up is searched together with the question it follows up on.
     const searchText = earlierQuestion ? `${earlierQuestion} ${question}` : question
+    const queryVector = await atStage('search', () => embedText(deps.ai, searchText, 'RETRIEVAL_QUERY'))
+
+    // 3. Stored answers first. Skipped for follow-ups to a clarifying question (the stored
+    //    answer was written for a stand-alone question) and when the employee asked for more detail.
+    //    No close match → carry on to the AI below, which may only use the policies it is given.
+    if (!skipFaq && !earlierQuestion) {
+        // A failed FAQ lookup (e.g. its index not deployed yet) must not stop the chat:
+        // log it and let the AI answer instead.
+        const faq = await matchFaq(deps, queryVector).catch((error) => {
+            console.warn('[chat] FAQ lookup failed, answering with the AI instead', error)
+            return null
+        })
+        if (faq) {
+            const sources = faq.policyTitle ? [{ policyTitle: faq.policyTitle, headingPath: faq.policyTitle }] : []
+            return reply('answer', faq.answer, { sources, fromFaq: true })
+        }
+    }
+
+    // 4. The policy search and the record lookup don't depend on each other, so they run in parallel.
     const [hits, recordResult] = await Promise.all([
-        atStage('search', () => searchPolicies(deps, searchText)),
+        atStage('search', () => searchPolicies(deps, queryVector)),
         atStage('record', () => readOwnRecord(deps, uid)),
     ])
     const record = recordResult.status === 'ok' ? recordResult.record : null
@@ -88,7 +109,7 @@ export async function answerQuestion(
     // "about my own record" from "off-topic" from "no policy covers this", and each of
     // those gets a different message.
 
-    // 3. One model call that returns a decision, not free text.
+    // 5. One model call that returns a decision, not free text.
     // headingPath already starts with the policy title, so it's used on its own.
     const policies = hits.length > 0 ? hits.map((h) => `(${h.headingPath})\n${h.text}`).join('\n\n') : '(none found)'
     const response = await atStage('generation', () =>
@@ -110,7 +131,7 @@ export async function answerQuestion(
 
     const decision = parseDecision(response.text)
 
-    // 4. CODE decides what each outcome means for the employee.
+    // 6. CODE decides what each outcome means for the employee.
     switch (decision.outcome) {
         case 'answer':
             return reply('answer', decision.text ?? '', { sources: toSources(hits) })

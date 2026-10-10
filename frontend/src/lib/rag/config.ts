@@ -19,3 +19,7 @@ export function numberFromEnv(name: string, fallback: number): number {
 // distance = 1 - similarity (0 = identical). Log real distances on the BA test
 // questions before trusting 0.38.
 export const RAG_DISTANCE_THRESHOLD = numberFromEnv('RAG_DISTANCE_THRESHOLD', 0.38)
+// Stored answers must match much more tightly than policy chunks: a stored answer is
+// shown word for word, so "close enough" would answer the wrong question. UNVERIFIED
+// like the one above. Log the distances of the BA test questions before trusting 0.15.
+export const FAQ_DISTANCE_THRESHOLD = numberFromEnv('FAQ_DISTANCE_THRESHOLD', 0.15)

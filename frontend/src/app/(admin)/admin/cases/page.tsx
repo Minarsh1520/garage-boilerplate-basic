@@ -1,4 +1,11 @@
 import { getEscalationCases } from '@/actions/escalation.actions'
+import { PRIORITY_LABELS } from '@/lib/cases'
+
+const PRIORITY_STYLE: Record<number, string> = {
+  1: 'bg-red-100 text-red-700',
+  2: 'bg-amber-100 text-amber-800',
+  3: 'bg-gray-100 text-gray-600',
+}
 
 export default async function CasesPage() {
   const cases = await getEscalationCases()
@@ -36,6 +43,10 @@ export default async function CasesPage() {
                     )}{' '}
                     {caseItem.title ?? 'Untitled case'}
                   </h2>
+
+                  <span className={`rounded px-2 py-0.5 text-xs font-semibold ${PRIORITY_STYLE[caseItem.priority] ?? PRIORITY_STYLE[3]}`}>
+                    {PRIORITY_LABELS[caseItem.priority] ?? PRIORITY_LABELS[3]}
+                  </span>
 
                   {caseItem.status && (
                     <span className="text-xs font-semibold uppercase text-[#4361AB]">

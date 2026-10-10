@@ -2,6 +2,7 @@
 
 import { adminDb } from '@/lib/firebase/admin'
 import { requireAdmin } from '@/actions/auth.actions'
+import { DEFAULT_PRIORITY, sortCasesForReview } from '@/lib/cases'
 
 export type EscalationCase = {
   id: string
@@ -12,6 +13,7 @@ export type EscalationCase = {
   summary?: string
   status?: string
   createdAt?: string
+  priority: number // 1 = look at first. Older cases without one count as 3
 }
 
 export async function getEscalationCases(): Promise<EscalationCase[]> {
@@ -22,7 +24,7 @@ export async function getEscalationCases(): Promise<EscalationCase[]> {
     .orderBy('createdAt', 'desc')
     .get()
 
-  return snapshot.docs.map((doc) => {
+  const cases = snapshot.docs.map((doc) => {
     const data = doc.data()
 
     return {
@@ -33,9 +35,12 @@ export async function getEscalationCases(): Promise<EscalationCase[]> {
       employeeId: data.employeeId,
       summary: data.summary,
       status: data.status,
+      priority: [1, 2, 3].includes(data.priority) ? data.priority : DEFAULT_PRIORITY,
       createdAt: data.createdAt?.toDate
         ? data.createdAt.toDate().toISOString()
         : undefined,
     }
   })
+
+  return sortCasesForReview(cases)
 }

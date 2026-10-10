@@ -10,19 +10,32 @@ const ALEX = {
     const CHUNK = { policyId: 'leave-policy', policyTitle: 'Leave Policy', chunkIndex: 0, headingPath: 'Leave Policy > Approval process', text: 'Your manager approves leave.' }
 
     // Fake Gemini + Firestore: no network, no quota. `decision` is what the "model" returns.
-    function fakeDeps(options: { decision?: unknown; hits?: object[]; record?: object | null; generate?: () => Promise<unknown> }) {
+    function fakeDeps(options: {
+        decision?: unknown
+        hits?: object[]
+        faqHits?: object[]
+        faqError?: boolean
+        record?: object | null
+        generate?: () => Promise<unknown>
+    }) {
+    const embedContent = vi.fn(async () => ({ embeddings: [{ values: Array.from({ length: 768 }, () => 1) }] }))
     const generateContent = vi.fn(options.generate ?? (async () => ({ text: JSON.stringify(options.decision) })))
     const deps = {
         ai: {
         models: {
-            embedContent: vi.fn(async () => ({ embeddings: [{ values: Array.from({ length: 768 }, () => 1) }] })),
+            embedContent,
             generateContent,
         },
         },
         db: {
-        collection: () => ({
+        // faqAnswers gets its own results (none by default); every other collection gets policy chunks.
+        collection: (name: string) => ({
             findNearest: () => ({
-            get: async () => ({ docs: (options.hits ?? [CHUNK]).map((data, i) => ({ id: `c${i}`, data: () => data, get: () => 0.2 })) }),
+            get: async () => {
+                if (name === 'faqAnswers' && options.faqError) throw new Error('index not deployed')
+                const rows = name === 'faqAnswers' ? (options.faqHits ?? []) : (options.hits ?? [CHUNK])
+                return { docs: rows.map((data, i) => ({ id: `c${i}`, data: () => data, get: () => 0.1 })) }
+            },
             }),
         }),
         doc: () => ({
@@ -30,7 +43,7 @@ const ALEX = {
         }),
         },
     } as unknown as RagDeps
-    return { deps, generateContent }
+    return { deps, generateContent, embedContent }
     }
 
     const ask = (deps: RagDeps, question: string, earlierQuestion?: string) => answerQuestion(deps, { uid: 'u1', question, earlierQuestion })
@@ -121,5 +134,50 @@ const ALEX = {
     const reply = await ask(deps, 'What tasks are left?')
     expect(reply.kind).toBe('fallback')
     expect(reply.text).toMatch(/on your record/)
+    })
+
+    // ---- Stored answers (Admin FAQ page) ----
+    const FAQ = { question: 'How do I request leave?', answer: 'Use My Leave in the Employee Portal.', policyTitle: 'Leave Policy', active: true }
+
+    it('returns a stored answer word for word, with no model call and one embedding', async () => {
+        const { deps, generateContent, embedContent } = fakeDeps({ faqHits: [FAQ] })
+        const reply = await ask(deps, 'how can I request leave')
+        expect(reply).toMatchObject({ kind: 'answer', text: FAQ.answer, fromFaq: true, sources: [{ policyTitle: 'Leave Policy' }] })
+        expect(generateContent).not.toHaveBeenCalled()
+        expect(embedContent).toHaveBeenCalledTimes(1)
+    })
+
+    it('skips a switched-off stored answer and goes to the AI', async () => {
+        const { deps, generateContent } = fakeDeps({ faqHits: [{ ...FAQ, active: false }], decision: { outcome: 'answer', text: 'From the policy.' } })
+        const reply = await ask(deps, 'How do I request leave?')
+        expect(reply).toMatchObject({ kind: 'answer', text: 'From the policy.' })
+        expect(reply.fromFaq).toBeUndefined()
+        expect(generateContent).toHaveBeenCalledTimes(1)
+    })
+
+    it('goes to the AI, embedding only once, when "Get a more detailed answer" is pressed', async () => {
+        const { deps, generateContent, embedContent } = fakeDeps({ faqHits: [FAQ], decision: { outcome: 'answer', text: 'Longer answer.' } })
+        const reply = await answerQuestion(deps, { uid: 'u1', question: 'How do I request leave?', skipFaq: true })
+        expect(reply.text).toBe('Longer answer.')
+        expect(generateContent).toHaveBeenCalledTimes(1)
+        expect(embedContent).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not use stored answers for a reply to a clarifying question', async () => {
+        const { deps } = fakeDeps({ faqHits: [FAQ], decision: { outcome: 'answer', text: 'Follow-up answer.' } })
+        expect((await ask(deps, 'leave', 'What do I do?')).text).toBe('Follow-up answer.')
+    })
+
+    it('still answers with the AI when the stored-answer lookup fails', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {})
+        const { deps } = fakeDeps({ faqError: true, decision: { outcome: 'answer', text: 'From the policy.' } })
+        expect(await ask(deps, 'How do I request leave?')).toMatchObject({ kind: 'answer', text: 'From the policy.' })
+    })
+
+    it('with no stored answer and no policy, says so instead of inventing one', async () => {
+        const { deps } = fakeDeps({ hits: [], decision: { outcome: 'not_found' } })
+        const reply = await ask(deps, 'Do we get a gym membership?')
+        expect(reply.kind).toBe('fallback')
+        expect(reply.text).toMatch(/no approved onboarding information/)
     })
 })

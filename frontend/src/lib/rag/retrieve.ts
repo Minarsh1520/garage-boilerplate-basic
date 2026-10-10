@@ -15,8 +15,10 @@ const chunkSchema = z.object({
 })
 export type RetrievedChunk = z.infer<typeof chunkSchema> & { id: string; distance?: number }
 
-export async function searchPolicies(deps: RagDeps, query: string, limit = 4): Promise<RetrievedChunk[]> {
-    const queryVector = await embedText(deps.ai, query, 'RETRIEVAL_QUERY')
+// `query` can be text, or a vector that was already embedded: the chat pipeline embeds
+// the question once and uses that vector for the FAQ check AND this search.
+export async function searchPolicies(deps: RagDeps, query: string | number[], limit = 4): Promise<RetrievedChunk[]> {
+    const queryVector = typeof query === 'string' ? await embedText(deps.ai, query, 'RETRIEVAL_QUERY') : query
     const snapshot = await deps.db
         .collection('hrKnowledge')
         .findNearest({

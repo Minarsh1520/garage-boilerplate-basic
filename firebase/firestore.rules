@@ -88,7 +88,8 @@ service cloud.firestore {
     // default deny) so the intent is documented.
     //   employeeData/{uid}      one onboarding record per employee (Home checklist, chatbot)
     //   escalationCases/{id}    created by the chatbot, read by the Admin page
-    //   policyDocuments/{id}    files uploaded on the Admin page
+    //   policyDocuments/{id}    one row per published policy (Admin Policy page)
+    //   faqAnswers/{id}         stored answers (Admin Stored Answers page, chatbot)
     match /employeeData/{uid} {
       allow read, write: if false;
     }
@@ -96,6 +97,9 @@ service cloud.firestore {
       allow read, write: if false;
     }
     match /policyDocuments/{docId} {
+      allow read, write: if false;
+    }
+    match /faqAnswers/{faqId} {
       allow read, write: if false;
     }
   }

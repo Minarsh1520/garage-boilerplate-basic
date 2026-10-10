@@ -42,6 +42,10 @@ export const requestEscalationSchema = z.object({
 
 export const sendChatMessageSchema = z.array(chatTurnSchema).min(1).max(50)
 
+// Extra choices sent with a message. skipFaq is set by the "Get a more detailed answer"
+// button: the stored answer is skipped and the question goes to the AI with the policies.
+export const sendChatOptionsSchema = z.object({ skipFaq: z.boolean().optional() }).optional()
+
 export type ChatTurn = z.infer<typeof chatTurnSchema>
 
 export interface AssistantReply {
@@ -55,4 +59,7 @@ export interface AssistantReply {
   // Present when the employee may send this question to the HR team. Nothing is saved
   // until they press the button: the offer alone creates no case.
   escalationOffer?: { category: CaseCategory; pathway: Pathway }
+  // True when the text is a stored answer from the Admin FAQ page, not written by the AI.
+  // The chat window then offers "Get a more detailed answer".
+  fromFaq?: boolean
 }

@@ -23,6 +23,9 @@ interface Message {
   kind?: AssistantMessageKind
   retryable?: boolean      // error replies: show "Try again"
   suggestions?: string[]   // ready-made questions shown as buttons
+  // A stored answer from the Admin FAQ page: show "Get a more detailed answer",
+  // which re-asks this question with the stored answer skipped.
+  faqQuestion?: string
   // An offer to send the question to the HR team, with the question it refers to.
   // Removed once the employee answers it, so it can't be sent twice.
   offer?: NonNullable<AssistantReply['escalationOffer']> & { question: string }
@@ -55,7 +58,7 @@ export function ChatWindow() {
 
   // Takes the question as a parameter (instead of reading the input box) so the
   // "Try again" and suggested-question buttons can send through the same path.
-  async function send(rawQuestion: string) {
+  async function send(rawQuestion: string, options?: { skipFaq?: boolean }) {
     const question = rawQuestion.trim()
 
     if (!question || isPending) return
@@ -75,7 +78,7 @@ export function ChatWindow() {
 
     try {
       // toHistory drops error bubbles and keeps only the recent turns the server needs.
-      const result = await sendChatMessage(toHistory(nextMessages))
+      const result = await sendChatMessage(toHistory(nextMessages), options)
 
       if (!result.success || !result.data) {
         toast.error(result.error ?? 'Failed to get a response')
@@ -89,6 +92,7 @@ export function ChatWindow() {
         kind: reply.kind,
         retryable: reply.retryable,
         suggestions: reply.suggestions,
+        faqQuestion: reply.fromFaq ? question : undefined,
         offer: reply.escalationOffer ? { ...reply.escalationOffer, question } : undefined,
       })
 
@@ -123,7 +127,9 @@ export function ChatWindow() {
       if (result.success && result.data) {
         addAssistantMessage({
           kind: 'escalate',
-          text: `Your question has been sent to the HR team to review. Reference: ${result.data.caseId}`,
+          text: result.data.alreadySent
+            ? `You already sent this question to the HR team today, so it was not sent again. Reference: ${result.data.caseId}`
+            : `Your question has been sent to the HR team to review. Reference: ${result.data.caseId}`,
         })
       } else {
         addAssistantMessage({
@@ -209,6 +215,17 @@ export function ChatWindow() {
                     No thanks
                   </button>
                 </div>
+              )}
+
+              {isLatest && message.faqQuestion && (
+                <button
+                  type="button"
+                  onClick={() => void send(message.faqQuestion ?? '', { skipFaq: true })}
+                  disabled={isPending}
+                  className={cn(CHIP_BUTTON, 'mt-2')}
+                >
+                  Get a more detailed answer
+                </button>
               )}
 
               {isLatest && isError && message.retryable && lastQuestion && (
