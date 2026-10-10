@@ -8,6 +8,12 @@ describe('classifyError', () => {
         expect(classifyError(error)).toMatchObject({ code: 'AI-503', side: 'ai', stage: 'generation', retryable: true })
     })
 
+    it('reports a used-up allowance (429) without offering Try again', () => {
+        const error = new StageError('generation', new ApiError({ status: 429, message: 'quota' }))
+        expect(classifyError(error)).toMatchObject({ code: 'AI-429', side: 'ai', retryable: false })
+        expect(classifyError(error).userMessage).toMatch(/usage limit/)
+    })
+
     it('reports a Gemini failure during the search as AI-side too', () => {
         const error = new StageError('search', new ApiError({ status: 429, message: 'quota' }))
         expect(classifyError(error)).toMatchObject({ code: 'AI-429', side: 'ai', stage: 'search' })

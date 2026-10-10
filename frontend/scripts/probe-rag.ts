@@ -4,7 +4,7 @@
 // RAG_DISTANCE_THRESHOLD between them. Read-only: writes nothing.
 import { initializeApp, cert } from 'firebase-admin/app'
 import { getFirestore } from 'firebase-admin/firestore'
-import { GoogleGenAI } from '@google/genai'
+import { createGeminiPoolFromEnv } from '../src/lib/rag/gemini-pool'
 import { embedText } from '../src/lib/rag/embed'
 
 // The BA's three test questions, plus off-topic controls that SHOULD score badly.
@@ -21,7 +21,7 @@ async function main() {
   if (!serviceAccount) throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY_BASE64 not set')
   const app = initializeApp({ credential: cert(JSON.parse(Buffer.from(serviceAccount, 'base64').toString('utf8'))) })
   const db = getFirestore(app)
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+  const ai = createGeminiPoolFromEnv()
 
   for (const { question, expect } of QUESTIONS) {
     const queryVector = await embedText(ai, question, 'RETRIEVAL_QUERY')

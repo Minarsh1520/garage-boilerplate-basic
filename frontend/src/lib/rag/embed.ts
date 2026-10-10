@@ -1,11 +1,11 @@
-import type { GoogleGenAI } from '@google/genai'
+import type { GenAI } from './gemini-pool'
 import { EMBED_DIM, EMBED_MODEL } from './config'
 import { withRetry } from './retry'
 // taskType shapes the vector for its role: RETRIEVAL_DOCUMENT when storing policy
 // text, RETRIEVAL_QUERY when embedding a question, so questions land near their
 // answers. Mixing them up degrades match quality silently.
 export async function embedText(
-    ai: GoogleGenAI,
+    ai: GenAI,
     text: string,
     taskType: 'RETRIEVAL_DOCUMENT' | 'RETRIEVAL_QUERY'
     ): Promise<number[]> {

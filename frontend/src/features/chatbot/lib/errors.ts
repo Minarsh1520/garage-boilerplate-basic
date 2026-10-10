@@ -27,6 +27,7 @@ export interface ClassifiedError {
 }
 
 const BUSY = 'The assistant is busy right now. Please try again in a moment.'
+const USED_UP = 'The assistant has reached its usage limit for now. Please try again later, or contact HR if it is urgent.'
 const GENERIC = 'Something went wrong while answering. Please try again.'
 const NOT_WORKING = 'The assistant is not available right now. Please contact HR if you need help with this.'
 
@@ -39,7 +40,12 @@ export function classifyError(error: unknown): ClassifiedError {
   // Anything Gemini rejected, whichever step called it (the search embeds the question too).
     if (original instanceof ApiError) {
     const status = original.status
-    if (status === 503 || status === 429) return { code: `AI-${status}`, side: 'ai', stage, retryable: true, userMessage: BUSY }
+    // 503: busy, usually clears in seconds, so "Try again" is offered.
+    if (status === 503) return { code: 'AI-503', side: 'ai', stage, retryable: true, userMessage: BUSY }
+    // 429: every key and model in the pool is used up. Pressing "Try again" straight away
+    // can't work, so it isn't offered.
+    if (status === 429) return { code: 'AI-429', side: 'ai', stage, retryable: false, userMessage: USED_UP }
+    
     // 400/401/403/404: bad key, wrong model name, bad request. Retrying won't help; a developer has to fix it.
     return { code: `AI-${status}`, side: 'ai', stage, retryable: false, userMessage: NOT_WORKING }
     }
