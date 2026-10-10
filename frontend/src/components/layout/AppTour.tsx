@@ -10,11 +10,15 @@ export function AppTour() {
   const [step, setStep] = useState(0)
   const { user, profile, loading } = useAuthContext()
   const router = useRouter()
-  useEffect(() => {
-    if (!loading && user && profile?.tourCompleted !== true) {
-      setStep(1)
-    }
-  }, [loading, user, profile])
+  // Start the tour once, the first time we know the user hasn't finished it. Done during
+  // render (React's "adjusting state when a prop changes" pattern) instead of in an effect,
+  // which the react-hooks/set-state-in-effect lint rule rejects. `started` stops it
+  // re-opening after the user closes it.
+  const [started, setStarted] = useState(false)
+  if (!started && !loading && user && profile?.tourCompleted !== true) {
+    setStarted(true)
+    setStep(1)
+  }
 
   useEffect(() => {
     const checklist = document.querySelector<HTMLElement>(
@@ -271,7 +275,7 @@ export function AppTour() {
               </h3>
 
               <p className="mt-1 text-xs text-[#222222]">
-                It also contains the status of your task, and when it's due.
+                It also contains the status of your task, and when it&apos;s due.
               </p>
             </div>
           </div>
@@ -363,7 +367,7 @@ export function AppTour() {
               </h3>
 
               <p className="mt-1 text-xs text-[#222222]">
-                We'll move to the assistant page now, click next!
+                We&apos;ll move to the assistant page now, click next!
               </p>
             </div>
           </div>
@@ -571,7 +575,7 @@ export function AppTour() {
               </h3>
 
               <p className="mt-1 text-xs text-[#222222]">
-                Let's try asking it a question!
+                Let&apos;s try asking it a question!
               </p>
             </div>
           </div>
@@ -653,7 +657,7 @@ export function AppTour() {
               </h3>
 
               <p className="mt-1 text-xs text-[#222222]">
-                Here is the assistant's response.
+                Here is the assistant&apos;s response.
               </p>
             </div>
           </div>
@@ -747,7 +751,7 @@ export function AppTour() {
               </h3>
 
               <p className="mt-1 text-xs text-[#222222]">
-                That's all!
+                That&apos;s all!
               </p>
             </div>
           </div>

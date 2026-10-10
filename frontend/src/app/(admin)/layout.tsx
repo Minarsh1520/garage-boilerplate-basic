@@ -17,7 +17,10 @@ export default async function AdminLayout({
       <div className="flex flex-1 overflow-hidden">
         <AdminSidebar />
 
-        <main className="flex-1 overflow-y-auto bg-white pb-20 lg:pb-0">
+        {/* text-[#222222] (Nihal's text colour) is set here for every page inside. globals.css
+            turns page text near-white when the computer is in dark mode, but these pages stay
+            white, so any text without its own colour faded out. */}
+        <main className="flex-1 overflow-y-auto bg-white pb-20 text-[#222222] lg:pb-0">
           {children}
         </main>
       </div>

@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getServerSession } from '@/actions/auth.actions'
-import { adminDb } from '@/lib/firebase/admin'
 import { getEmployeeOnboarding } from '@/lib/onboarding'
 
 export const metadata: Metadata = {
@@ -11,12 +10,6 @@ export const metadata: Metadata = {
 export default async function DashboardPage() {
   const session = await getServerSession()
   const onboarding = session ? await getEmployeeOnboarding(session.uid) : null
-  const profileSnap = session ? await adminDb.collection('users').doc(session.uid).get() : null
-
-  const displayName = profileSnap?.exists
-    ? (profileSnap.data()?.displayName as string | null)
-    : null
-  const greetingName = displayName ?? session?.email ?? null
 
   return (
     <div className="space-y-4 px-6 py-5">

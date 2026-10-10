@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { House, BotMessageSquare } from 'lucide-react'
+import { House, BotMessageSquare, Shield } from 'lucide-react'
 
 export const navItems = [
   {
@@ -14,13 +14,23 @@ export const navItems = [
   },
 ]
 
-export function Sidebar() {
+// Only shown to admins (see app/(dashboard)/layout.tsx). The Admin home page then links
+// to Policy, Stored Answers, Escalation Cases and Employees.
+const adminItem = {
+  href: '/admin',
+  label: 'Admin',
+  icon: Shield,
+}
+
+export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
+  const items = isAdmin ? [...navItems, adminItem] : navItems
+
   return (
     <>
       {/* Desktop sidebar */}
       <aside className="hidden w-44 flex-col border-r-4 border-[#4361AB] bg-[#DDE8F2] lg:flex">
         <nav className="flex-1 space-y-2 p-4">
-          {navItems.map(({ href, label, icon: Icon }) => (
+          {items.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
@@ -41,7 +51,7 @@ export function Sidebar() {
 
       {/* Mobile bottom navigation */}
       <nav className="fixed inset-x-0 bottom-0 z-50 flex border-t border-[#4361AB] bg-[#DDE8F2] lg:hidden">
-        {navItems.map(({ href, label, icon: Icon }) => (
+        {items.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
