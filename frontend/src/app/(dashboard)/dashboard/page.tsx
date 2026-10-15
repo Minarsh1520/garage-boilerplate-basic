@@ -105,42 +105,35 @@ export default async function DashboardPage() {
             No onboarding data available.
           </p>
         ) : (
-          <div className="mt-2 border-t border-zinc-500">
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
             {onboarding.checklist.map((item, index) => (
               <div
                 key={item.id}
-                className="flex items-start justify-between gap-4 border-b border-zinc-500 px-1 py-3"
+                className="rounded-lg border border-[#C9D8E8] bg-[#F4F7FB] p-4"
               >
-                <div
-                  data-tour={
-                    index === 0
-                      ? 'task-details'
-                      : undefined
-                  }
-                  className="relative min-w-0"
-                >
-                  <p className="text-lg font-medium text-[#222222] sm:text-xl">
-                    {item.title}
-                  </p>
+                <div className="flex items-start justify-between gap-4">
+                  <div data-tour={index === 0 ? 'task-details' : undefined} className="relative">
+                    <p className="text-base font-semibold text-[#222222]">
+                      {item.title}
+                    </p>
 
-                  <p className="mt-1 text-sm text-zinc-600">
-                    {item.description}
-                  </p>
+                    <p className="mt-1 text-sm text-[#555555]">
+                      {item.description}
+                    </p>
+                  </div>
+
+                  <div
+                    data-tour={index === 0 ? 'task-status' : undefined}
+                    className="relative shrink-0 text-right"
+                  >
+                    <p className="text-xs font-bold text-[#4361AB]">
+                      {item.status.toUpperCase()}
+                    </p>
+                  </div>
                 </div>
 
-                <div
-                  data-tour={
-                    index === 0
-                      ? 'task-status'
-                      : undefined
-                  }
-                  className="relative shrink-0 text-right"
-                >
-                  <p className="text-xs font-bold text-[#4361AB]">
-                    {item.status.toUpperCase()}
-                  </p>
-
-                  <p className="mt-4 text-xs text-zinc-500">
+                <div className="mt-4 border-t border-[#D8E2F0] pt-3">
+                  <p className="text-xs font-medium text-[#555555]">
                     Due in: {item.duein}
                   </p>
                 </div>
