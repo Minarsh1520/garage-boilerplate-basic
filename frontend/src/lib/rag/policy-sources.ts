@@ -9,7 +9,13 @@ export const policySectionSchema = z.object({
     body: z.string().trim().min(1, 'Every section needs some text.').max(8000),
 })
 export const policyFormSchema = z.object({
-    title: z.string().trim().min(3, 'Please give the policy a title.').max(120),
+    title: z
+        .string()
+        .trim()
+        .min(3, 'Please give the policy a title.')
+        .max(120)
+        // Any language counts ("Chính sách nghỉ phép", "請假政策"); only symbols and emoji don't.
+        .refine((t) => /[\p{L}\p{N}]/u.test(t), 'The title needs at least one letter or number.'),
     intro: z.string().trim().max(4000).optional().transform((v) => v || undefined),
     sections: z.array(policySectionSchema).min(1, 'Add at least one section.').max(50),
 })
@@ -20,13 +26,27 @@ export type PolicySection = z.infer<typeof policySectionSchema>
 // same id the seed script uses for seed/policies/leave-policy.md. Publishing a policy
 // with the same title again REPLACES its old version instead of adding a second copy.
 export function slugify(title: string): string {
-    return title
+    const slug = title
         .toLowerCase()
         .normalize('NFKD')
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '')
         .slice(0, 60)
         .replace(/-+$/, '')
+    // A title with no English letters or digits (e.g. one written only in Chinese) gives an
+    // empty slug. It then gets "policy-" plus a short code worked out from the title, so the
+    // same title always gives the same id and publishing it again still replaces it.
+    return slug || (title.trim() ? `policy-${shortHash(title.trim())}` : '')
+}
+
+// A short, stable code for a piece of text (FNV-1a, 32-bit). Not for security: only for ids.
+function shortHash(text: string): string {
+    let hash = 0x811c9dc5
+    for (const char of text) {
+        hash ^= char.codePointAt(0) ?? 0
+        hash = Math.imul(hash, 0x01000193) >>> 0
+    }
+    return hash.toString(36)
 }
 
 // A body line starting with "#" would be read by the chunker as a new heading and
@@ -91,14 +111,16 @@ export function markdownToForm(markdown: string): PolicyForm {
 //   - Any text before section 1 is the introduction (optional).
 //   - Each section starts with a numbered heading on its own line: "1. Requesting leave".
 //     Numbers go 1, 2, 3... in order. Typed numbers and Word's automatic numbering both work.
-//   - Everything under a heading is that section's text. Lists inside a section use bullet
-//     points, never numbers, because numbers are reserved for section headings.
+//   - Everything under a heading is that section's text. A list inside a section uses bullet
+//     points, or numbers when it has two or more items in a row (see looksLikeHeading).
+//   - Word only: a Heading 1 line is a section heading too (docx.ts numbers it).
 
 export const POLICY_LAYOUT_RULES = [
     'The first line is the policy title.',
     'Text before the first section is the introduction (optional).',
     'Each section starts with a numbered heading on its own line, for example "1. Requesting leave". Number them 1, 2, 3 in order.',
-    'Everything under a heading is that section’s text. Inside a section, use bullet points for lists, not numbers.',
+    'Everything under a heading is that section’s text. A list inside a section can use bullet points, or numbers if it has two or more items in a row.',
+    'In Word, a line in the Heading 1 style also counts as a section heading; its number is added for you.',
 ] as const
 
 // The file types the Policy page accepts. Kept here (not in policy-file.ts) because the
@@ -112,6 +134,14 @@ export type PolicyLayoutResult = { ok: true; form: PolicyForm } | { ok: false; p
 const HEADING = /^(\d{1,2})[.)]\s+(\S.*)$/
 const BULLET = /^\s*[•●▪◦‣\-*–]\s+/
 const MAX_PROBLEMS = 8 // enough to fix the file; a list of 200 helps nobody
+
+// Numbered lines are section headings, EXCEPT inside a numbered list. A line is a list item
+// when it continues a list (the line before was item n-1) or starts one (the next line is
+// item n+1). When a line could be either (its number is also the next section's number),
+// it is a heading only if it LOOKS like one: short, and not ending like a sentence.
+// So "1. WHS induction." "2. Privacy." "3. Respect at Work." inside a section stay a list,
+// and the next section "3. Who to contact" is still a heading.
+const looksLikeHeading = (text: string) => !/[.!?;:,]$/.test(text) && text.split(/\s+/).length <= 10
 
 // `wrappedLines`: true for PDF, where a paragraph is printed over several lines and has to
 // be joined back together. Word and text files already give one line per paragraph.
@@ -134,21 +164,38 @@ export function parsePolicyText(text: string, options: { wrappedLines: boolean }
     const intro: string[] = []
     const sections: { heading: string; body: string[] }[] = []
     let joinNext = false
+    const rest = lines.slice(1)
+    const numberOf = (line: string | undefined) => {
+        const match = line === undefined ? null : HEADING.exec(line)
+        return match?.[1] ? Number(match[1]) : null
+    }
+    let lastListItem: number | null = null // the number of the list item on the line before
 
-    lines.slice(1).forEach((line, index) => {
+    rest.forEach((line, index) => {
         const lineNo = index + 2
         const heading = HEADING.exec(line)
         if (heading?.[1] && heading[2]) {
+            const n = Number(heading[1])
             const expected = sections.length + 1
-            if (Number(heading[1]) === expected) {
+            const inList = lastListItem === n - 1 || numberOf(rest[index + 1]) === n + 1
+            if (n === expected && (!inList || looksLikeHeading(heading[2].trim()))) {
                 sections.push({ heading: heading[2].trim(), body: [] })
                 joinNext = false
+                lastListItem = null
+                return
+            }
+            if (inList) {
+                // An item of a numbered list inside the section: kept exactly as written.
+                ;(sections.at(-1)?.body ?? intro).push(line)
+                joinNext = false
+                lastListItem = n
                 return
             }
             // A numbered line that is not the next section: kept as text, but reported, because
             // either a heading is missing or a list inside a section uses numbers.
-            problems.push(`Line ${lineNo}: "${line.slice(0, 60)}" is numbered ${heading[1]}, but the next section should be ${expected}. Numbers are only for section headings; use bullet points for lists inside a section.`)
+            problems.push(`Line ${lineNo}: "${line.slice(0, 60)}" is numbered ${heading[1]}, but the next section should be ${expected}. A single numbered line is read as a section heading: use a bullet point instead, or a numbered list of two or more lines.`)
         }
+        lastListItem = null
         const body = sections.at(-1)?.body ?? intro
         if (BULLET.test(line)) {
             body.push(`- ${line.replace(BULLET, '')}`)
@@ -172,7 +219,9 @@ export function parsePolicyText(text: string, options: { wrappedLines: boolean }
             const looksLikeListItem = /[.!?]$/.test(section.heading)
             problems.push(
                 `Section ${i + 1} ("${section.heading.slice(0, 60)}") has no text under it.` +
-                    (looksLikeListItem ? ' It looks like a numbered list item: use bullet points for lists inside a section.' : '')
+                    (looksLikeListItem
+                        ? ' It looks like a numbered list item: use bullet points for lists inside a section.'
+                        : ' If it is an item of a numbered list, end each item with a full stop, or use bullet points.')
             )
         }
     })
@@ -194,7 +243,9 @@ export function parsePolicyText(text: string, options: { wrappedLines: boolean }
 // Turns a schema error into words an admin can act on.
 function describeIssue(path: PropertyKey[], message: string): string {
     const [field, index, part] = path
-    if (field === 'title') return `The title (first line) must be between 3 and 120 characters. ${message}`
+    if (field === 'title') {
+        return message.startsWith('The title needs') ? `${message} The title is the file's first line.` : `The title (first line) must be between 3 and 120 characters. ${message}`
+    }
     if (field === 'intro') return 'The introduction is too long (4,000 characters at most).'
     if (field === 'sections' && typeof index === 'number') {
         return part === 'heading'

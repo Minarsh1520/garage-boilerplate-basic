@@ -52,7 +52,9 @@ export function markdownToLines(markdown: string): string {
             continue
         }
         if (inFence) {
-            if (raw.trim()) out.push(raw.trim()) // code block: kept line by line, as written
+            // Code block: kept line by line, inside backticks, so a line like "2. something"
+            // can never be read as a section heading.
+            if (raw.trim()) out.push(`\`${raw.trim()}\``)
             continue
         }
         if (!raw.trim() || RULE.test(raw) || TABLE_DIVIDER.test(raw)) {

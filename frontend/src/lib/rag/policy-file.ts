@@ -55,12 +55,12 @@ export async function readPolicyFile(fileName: string, bytes: Uint8Array): Promi
         case 'pdf':
             return parsePolicyText(await extractPdfText(bytes), { wrappedLines: true })
         case 'docx': {
-            const { text, usesHeadingStyles } = await extractDocxText(bytes)
+            const { text, subHeadingsOnly } = await extractDocxText(bytes)
             const result = parsePolicyText(text, { wrappedLines: false })
-            // Word's heading styles can show automatic numbers on screen, but those numbers are
-            // not saved as text, so they never reach us. Say so, or the error is a mystery.
-            if (!result.ok && usesHeadingStyles && result.problems.some((p) => p.startsWith('No numbered section headings'))) {
-                result.problems.push('This file uses Word heading styles. If their numbers come from Word’s heading numbering, Word does not save them as text: type the numbers into the headings, or number the headings with a normal numbered list.')
+            // Heading 1 lines count as sections, but Heading 2 and below are read as text under
+            // a section. A file that only uses the smaller headings gets told which one to use.
+            if (!result.ok && subHeadingsOnly && result.problems.some((p) => p.startsWith('No numbered section headings'))) {
+                result.problems.push('This file uses Word’s Heading 2 (or smaller) style for its headings. Use the Heading 1 style for section headings, or number them.')
             }
             return result
         }
@@ -69,6 +69,6 @@ export async function readPolicyFile(fileName: string, bytes: Uint8Array): Promi
         case 'md':
             return parsePolicyText(markdownToLines(readText(bytes) ?? ''), { wrappedLines: false })
         case 'html':
-            return parsePolicyText(htmlToLines(readText(bytes) ?? ''), { wrappedLines: false })
+            return parsePolicyText(htmlToLines(readText(bytes) ?? '', { startAtFirstH1: true }), { wrappedLines: false })
     }
 }

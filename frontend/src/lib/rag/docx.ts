@@ -2,15 +2,17 @@ import mammoth from 'mammoth'
 import { htmlToLines } from './html'
 
 // Word (.docx) → plain lines of text, in the same shape the policy layout reader expects.
-// mammoth turns the document into simple HTML, which html.ts then turns into lines:
-//   - Word's automatic numbering becomes "1. ", "2. "... mammoth starts a new HTML list
-//     after every paragraph in between, so the count runs through the WHOLE document,
-//     as it does on screen for auto-numbered headings (numberAcrossLists).
-//   - Bullet points, and any list inside another list, become "- ".
+// mammoth turns the document into simple HTML, which html.ts then turns into lines
+// (see HtmlToLinesOptions.word for how Word's numbering and Heading 1 are read):
+//   - an auto-numbered heading becomes "1. ", "2. "..., counting through the whole document;
+//   - a numbered list of two or more items inside a section keeps its own 1, 2, 3;
+//   - a Heading 1 paragraph becomes the next numbered heading;
+//   - bullet points, and any list inside another list, become "- ".
 // Images, comments and formatting are dropped: only the words matter.
-// usesHeadingStyles: true when the document uses Word's Heading styles, so the caller can
-// explain why style-based heading numbers went missing (see policy-file.ts).
-export async function extractDocxText(bytes: Uint8Array): Promise<{ text: string; usesHeadingStyles: boolean }> {
+// subHeadingsOnly: the document uses Heading 2 (or lower) styles but never Heading 1, so the
+// caller can explain why no sections were found (see policy-file.ts).
+export async function extractDocxText(bytes: Uint8Array): Promise<{ text: string; subHeadingsOnly: boolean }> {
     const { value: html } = await mammoth.convertToHtml({ buffer: Buffer.from(bytes) })
-    return { text: htmlToLines(html, { numberAcrossLists: true }), usesHeadingStyles: /<h[1-6][\s>]/i.test(html) }
+    const subHeadingsOnly = /<h[2-6][\s>]/i.test(html) && !/<h1[\s>]/i.test(html)
+    return { text: htmlToLines(html, { word: true }), subHeadingsOnly }
 }

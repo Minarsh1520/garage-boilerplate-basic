@@ -21,8 +21,9 @@ const STATUS_STYLE: Record<PolicyListItem['status'], { label: string; className:
   'not-published': { label: 'Uploaded only, not in use', className: 'text-gray-500' },
 }
 
-// policyId is set when editing a published policy, so it is updated in place.
-type Draft = { form: PolicyForm; source: 'file' | 'form'; fileName?: string; policyId?: string }
+// policyId and version are set when editing a published policy, so it is updated in place
+// and a newer version someone else published in the meantime is noticed.
+type Draft = { form: PolicyForm; source: 'file' | 'form'; fileName?: string; policyId?: string; version?: number }
 
 export function PolicyManager({ policies }: { policies: PolicyListItem[] }) {
   const router = useRouter()
@@ -54,11 +55,32 @@ export function PolicyManager({ policies }: { policies: PolicyListItem[] }) {
     }
   }
 
-  async function handlePublish(form: PolicyForm) {
+  async function handlePublish(form: PolicyForm, replace = false) {
     if (!draft) return
     setBusy('publishing')
     try {
-      const result = await publishPolicyForm(form, draft.source, draft.fileName, draft.policyId)
+      const result = await publishPolicyForm({
+        form,
+        source: draft.source,
+        fileName: draft.fileName,
+        editingPolicyId: draft.policyId,
+        expectedVersion: draft.version,
+        replace,
+      })
+      if (result.success && result.data?.outcome === 'exists') {
+        // A policy with this title is already published: replacing it is the admin's call.
+        const { existingTitle, existingUpdatedAt } = result.data
+        const when = existingUpdatedAt ? ` (last published ${new Date(existingUpdatedAt).toLocaleDateString()})` : ''
+        setBusy(null)
+        if (window.confirm(`A policy called "${existingTitle}" already exists${when}. Replace it with this one?`)) {
+          await handlePublish(form, true)
+        }
+        return
+      }
+      if (result.success && result.data?.outcome === 'conflict') {
+        toast.error('Someone else published a newer version of this policy since you opened it. Close this form, open the policy again, then make your changes.')
+        return
+      }
       if (result.success) {
         toast.success(`Published: the assistant can now answer from "${form.title}".`)
         setDraft(null)
@@ -76,7 +98,7 @@ export function PolicyManager({ policies }: { policies: PolicyListItem[] }) {
 
   async function handleEdit(policyId: string) {
     const result = await getPolicyForm(policyId)
-    if (result.success && result.data) setDraft({ form: result.data, source: 'form', policyId })
+    if (result.success && result.data) setDraft({ form: result.data.form, source: 'form', policyId, version: result.data.version })
     else toast.error(result.error ?? 'This policy could not be opened.')
   }
 

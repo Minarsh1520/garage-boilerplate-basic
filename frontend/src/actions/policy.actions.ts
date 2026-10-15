@@ -46,38 +46,59 @@ export async function previewPolicyFile(fileName: unknown, fileData: unknown): P
 }
 
 // Step 2 (both routes): publish the checked form to the chatbot.
-export async function publishPolicyForm(
-  form: unknown,
-  source: unknown,
-  fileName?: unknown,
-  editingPolicyId?: unknown
-): Promise<ActionResult<{ policyId: string; chunkCount?: number }>> {
+//   new policy            fails with "exists" if the title is already in use, so the page can
+//                         ask "Replace it?", then calls again with replace: true
+//   edit (editingPolicyId) fails with "conflict" if someone published since the admin opened it
+const publishInputSchema = z.object({
+  form: z.unknown(),
+  source: z.enum(['file', 'form']).catch('form'),
+  fileName: z.string().max(200).optional().catch(undefined),
+  editingPolicyId: z.string().min(1).max(200).optional().catch(undefined),
+  expectedVersion: z.number().int().min(0).optional().catch(undefined),
+  replace: z.boolean().optional().catch(undefined),
+})
+
+export interface PublishOutcome {
+  outcome: 'published' | 'exists' | 'conflict'
+  policyId: string
+  chunkCount?: number
+  existingTitle?: string
+  existingUpdatedAt?: string
+}
+
+export async function publishPolicyForm(input: unknown): Promise<ActionResult<PublishOutcome>> {
   const session = await requireAdmin()
 
-  const parsed = policyFormSchema.safeParse(form)
+  const request = publishInputSchema.safeParse(input)
+  if (!request.success) return { success: false, error: 'Please check the form.' }
+  const parsed = policyFormSchema.safeParse(request.data.form)
   if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Please check the form.' }
-  const parsedSource = z.enum(['file', 'form']).catch('form').parse(source)
-  const parsedFileName = z.string().max(200).optional().catch(undefined).parse(fileName)
-  // Set only by "Edit": the policy keeps its id. Only an id that already exists is accepted,
-  // so this can't be used to write a policy under a made-up id.
-  const parsedEditId = idSchema.optional().catch(undefined).parse(editingPolicyId)
-  if (parsedEditId && !(await readPolicyForm({ db: adminDb }, parsedEditId))) {
-    return { success: false, error: 'The policy you were editing no longer exists. Please publish it as a new policy.' }
-  }
+  const { source, fileName, editingPolicyId, expectedVersion, replace } = request.data
 
   try {
     const result = await publishPolicy(getRagDeps(), {
       form: parsed.data,
-      source: parsedSource,
-      fileName: parsedFileName,
+      source,
+      fileName,
       uid: session.uid,
-      policyId: parsedEditId,
+      policyId: editingPolicyId,
+      mode: editingPolicyId ? 'edit' : replace ? 'replace' : 'new',
+      expectedVersion,
     })
     revalidatePath('/admin/policy')
-    if (result.status === 'failed') {
-      return { success: false, error: 'The policy could not be published. The previous version (if any) is still in use. Please try again.' }
+    switch (result.status) {
+      case 'ready':
+        return { success: true, data: { outcome: 'published', policyId: result.policyId, chunkCount: result.chunkCount } }
+      case 'exists':
+        return {
+          success: true,
+          data: { outcome: 'exists', policyId: result.policyId, existingTitle: result.existingTitle, existingUpdatedAt: result.existingUpdatedAt },
+        }
+      case 'conflict':
+        return { success: true, data: { outcome: 'conflict', policyId: result.policyId } }
+      case 'failed':
+        return { success: false, error: 'The policy could not be published. The previous version (if any) is still in use. Please try again.' }
     }
-    return { success: true, data: { policyId: result.policyId, chunkCount: result.chunkCount } }
   } catch (error) {
     console.error('[policy] publish failed', error)
     return { success: false, error: 'The policy could not be published. Please try again.' }
@@ -89,12 +110,14 @@ export async function getPolicies(): Promise<PolicyListItem[]> {
   return listPolicies({ db: adminDb })
 }
 
-export async function getPolicyForm(policyId: unknown): Promise<ActionResult<PolicyForm>> {
+// The form and its version: the version is sent back on publish, so a change someone else
+// published in the meantime is caught instead of silently overwritten.
+export async function getPolicyForm(policyId: unknown): Promise<ActionResult<{ form: PolicyForm; version: number }>> {
   await requireAdmin()
   const parsed = idSchema.safeParse(policyId)
   if (!parsed.success) return { success: false, error: 'That policy could not be found.' }
-  const form = await readPolicyForm({ db: adminDb }, parsed.data)
-  return form ? { success: true, data: form } : { success: false, error: 'This policy has no saved form to edit. Please upload it again.' }
+  const saved = await readPolicyForm({ db: adminDb }, parsed.data)
+  return saved ? { success: true, data: saved } : { success: false, error: 'This policy has no saved form to edit. Please upload it again.' }
 }
 
 export async function removePolicy(policyId: unknown): Promise<ActionResult> {

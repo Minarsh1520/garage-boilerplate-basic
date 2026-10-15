@@ -23,6 +23,8 @@ export function chunkMarkdown(markdown: string): Chunk[] {
     // removed here so they are never embedded or shown to an employee.
     const content = markdown.replace(/<!--[\s\S]*?-->/g, '')
 
+    // Splits on Windows (\r\n) and Unix (\n) line endings alike. With a plain '\n' split, a file
+    // saved with Windows endings keeps a hidden \r on every line and no heading is recognised.
     for (const line of content.split(/\r?\n/)) {
         const heading = /^(#{1,3})\s+(.+)$/.exec(line)
         if (heading?.[1] && heading[2]) {
@@ -41,17 +43,46 @@ export function chunkMarkdown(markdown: string): Chunk[] {
         .map((chunk, chunkIndex) => ({ ...chunk, chunkIndex }))
 }
 
-// Known limits (fine for demo policies, revisit for real uploads): the overlap may
-// start mid-word, and a single paragraph over MAX_CHARS stays as one oversized chunk.
+// Splits text that is too long for one chunk into pieces of at most MAX_CHARS, at the
+// most natural boundary available: lines first, then sentence ends, then spaces. Only a
+// single "word" longer than MAX_CHARS (a pasted link, say) is cut mid-word.
+export function splitOversized(text: string): string[] {
+    if (text.length <= MAX_CHARS) return [text]
+    for (const boundary of [/(?<=\n)/, /(?<=[.!?])\s+/, /\s+/]) {
+        const parts = text.split(boundary).filter((p) => p.trim())
+        if (parts.length > 1) {
+            // Pack the parts back together up to MAX_CHARS, then split any still too long.
+            const packed: string[] = []
+            let current = ''
+            for (const part of parts) {
+                if (current && current.length + part.length + 1 > MAX_CHARS) {
+                    packed.push(current)
+                    current = ''
+                }
+                current = current ? `${current}${current.endsWith('\n') ? '' : ' '}${part}` : part
+            }
+            if (current) packed.push(current)
+            return packed.flatMap((piece) => (piece.length > MAX_CHARS ? splitOversized(piece) : [piece.trim()]))
+        }
+    }
+    const pieces: string[] = []
+    for (let i = 0; i < text.length; i += MAX_CHARS) pieces.push(text.slice(i, i + MAX_CHARS))
+    return pieces
+}
+
+// Sections are packed paragraph by paragraph. A paragraph that is too long on its own is
+// first split by splitOversized, so no chunk is ever bigger than the embedding model can
+// take: a section near the 8,000-character limit used to be one oversized chunk.
+// Known limit: the overlap may start mid-word.
 function splitLongSection({ headingPath, body }: { headingPath: string; body: string }) {
     if (body.length <= MAX_CHARS) return [{ headingPath, text: body }]
 
     const pieces: string[] = []
     let current = ''
-    for (const paragraph of body.split(/\n\s*\n/)) {
+    for (const paragraph of body.split(/\n\s*\n/).flatMap(splitOversized)) {
         if (current && current.length + paragraph.length > MAX_CHARS) {
-        pieces.push(current)
-        current = current.slice(-OVERLAP_CHARS)
+            pieces.push(current)
+            current = current.slice(-OVERLAP_CHARS)
         }
         current = current ? `${current}\n\n${paragraph}` : paragraph
     }

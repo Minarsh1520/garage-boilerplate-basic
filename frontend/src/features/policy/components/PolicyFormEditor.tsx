@@ -5,6 +5,7 @@ import { Download, Plus, Trash2 } from 'lucide-react'
 import {
   formToLayoutText,
   numberedBodyLines,
+  parsePolicyText,
   policyFormSchema,
   slugify,
   stripHeadingNumber,
@@ -22,7 +23,8 @@ const BUTTON =
   'rounded bg-[#4361AB] px-4 py-2 text-sm font-semibold text-white hover:bg-[#36509A] disabled:cursor-not-allowed disabled:opacity-50'
 
 // The form follows the SAME layout every uploaded file must follow (POLICY_LAYOUT_RULES):
-// a title, an optional introduction, then numbered sections whose lists use bullet points.
+// a title, an optional introduction, then numbered sections (lists inside use bullet points,
+// or two or more numbered items).
 // The numbers are added by the form, so the admin only types the words.
 export function PolicyFormEditor(props: {
   initial: PolicyForm
@@ -50,11 +52,22 @@ export function PolicyFormEditor(props: {
     cleaned.forEach((s, i) => {
       if (!s.heading) found.push(`Section ${i + 1} needs a heading.`)
       if (!s.body) found.push(`Section ${i + 1} needs some text.`)
-      const numbered = numberedBodyLines(s.body)
-      if (numbered.length > 0) {
-        found.push(`Section ${i + 1}: "${numbered[0]?.slice(0, 50)}" starts with a number. Numbers are only for section headings; start list lines with "- " instead.`)
-      }
     })
+    // The typed policy must read back the same through the SAME layout reader used for
+    // uploads, so a typed policy and an uploaded one can never be read differently.
+    if (found.length === 0) {
+      const readBack = parsePolicyText(formToLayoutText({ title, intro, sections: cleaned }), { wrappedLines: false })
+      if (!readBack.ok) found.push(...readBack.problems)
+      else {
+        const moved = cleaned.findIndex((s, i) => readBack.form.sections[i]?.heading !== s.heading)
+        if (moved >= 0 || readBack.form.sections.length !== cleaned.length) {
+          const at = Math.max(moved, 0)
+          found.push(
+            `Section ${at + 1}: a numbered line in the text would be read as a new section heading. End numbered list items with a full stop, use two or more numbered items, or start the line with "- ".`
+          )
+        }
+      }
+    }
     if (found.length === 0) {
       const parsed = policyFormSchema.safeParse({ title, intro, sections: cleaned })
       if (parsed.success) {
@@ -92,7 +105,7 @@ export function PolicyFormEditor(props: {
             <li>Give it the title employees will see as the source of an answer.</li>
             <li>Optionally, say in a sentence or two what it covers and who it applies to.</li>
             <li>Add one section per topic, with a short heading. Sections are numbered for you.</li>
-            <li>Write full sentences. For a list, start each line with &quot;- &quot;, never a number.</li>
+            <li>Write full sentences. For a list, start each line with &quot;- &quot;, or number two or more items ending with a full stop.</li>
           </ol>
           <p className="mt-2 text-xs text-gray-600">
             The assistant answers only from what is written here, so include who to contact and any deadlines.
@@ -171,7 +184,7 @@ export function PolicyFormEditor(props: {
 
             <label className={`mt-3 ${LABEL}`}>
               Text
-              <span className={`block ${HELP}`}>Full sentences. For a list, start each line with &quot;- &quot;.</span>
+              <span className={`block ${HELP}`}>Full sentences. For a list, start each line with &quot;- &quot;, or number two or more items (1. 2. 3.).</span>
               <textarea
                 value={section.body}
                 onChange={(e) => updateSection(index, { body: e.target.value })}
@@ -184,7 +197,7 @@ export function PolicyFormEditor(props: {
             <div className="mt-1 flex justify-between text-xs">
               {/* Same rule as file uploads, shown as they type rather than after Publish. */}
               <span className="text-amber-700">
-                {numbered.length > 0 ? 'Lines starting with a number: use "- " instead. Numbers are for section headings.' : ''}
+                {numbered.length === 1 ? 'A single numbered line can be read as a section heading: use "- ", or two or more numbered items.' : ''}
               </span>
               <span className="text-gray-600">{section.body.length.toLocaleString()} / 8,000</span>
             </div>

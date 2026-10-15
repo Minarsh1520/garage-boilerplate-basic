@@ -149,8 +149,9 @@ async function main() {
         const markdown = readFileSync(`seed/policies/${file}`, 'utf8')
         readPolicyTitle(file, markdown) // fails loudly on a file without exactly one "# Title"
         const policyId = file.replace(/\.md$/, '')
-        const result = await publishPolicy(deps, { form: markdownToForm(markdown), source: 'seed', uid: 'seed-script', policyId })
-        if (result.status === 'failed') throw new Error(`${file}: publishing failed (see the error above)`)
+        // 'replace': the seed files are the source of truth for the demo policies.
+        const result = await publishPolicy(deps, { form: markdownToForm(markdown), source: 'seed', uid: 'seed-script', policyId, mode: 'replace' })
+        if (result.status !== 'ready') throw new Error(`${file}: publishing failed (see the error above)`)
         console.info(`${file}: ${result.chunkCount} chunks`)
     }
 

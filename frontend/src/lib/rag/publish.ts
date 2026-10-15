@@ -19,35 +19,79 @@ export interface PolicyListItem {
     updatedAt?: string
 }
 
-// Publishing = save the form, then chunk + embed it into hrKnowledge. The row is marked
-// `processing` first, so a crash half way leaves a visible "processing"/"failed" row
-// rather than nothing. The old chunks stay live until the new ones are committed in one
-// batch (ingestPolicy), so employees never get a half-published policy.
+// How a publish may treat a policy that already exists:
+//   new      a new policy: stop if one with the same id exists, so the admin can confirm
+//   replace  the admin confirmed (or the seed script): overwrite whatever is there
+//   edit     an edit of version `expectedVersion`: stop if anyone published since
+export type PublishMode = 'new' | 'replace' | 'edit'
+
+export type PublishResult =
+    | { policyId: string; status: 'ready'; chunkCount: number }
+    | { policyId: string; status: 'failed' }
+    | { policyId: string; status: 'exists'; existingTitle: string; existingUpdatedAt?: string }
+    | { policyId: string; status: 'conflict' }
+
+// After this long, a policy still "processing" is treated as failed: the server stopped
+// half way (a crash, a timeout) and nothing will ever finish it.
+export const STUCK_AFTER_MS = 5 * 60 * 1000
+
+// Publishing = claim the policy, then chunk + embed it into hrKnowledge.
+//  1. The claim is ONE transaction: it checks the mode's rule and marks the row
+//     `processing` with a new `version` number. Two admins can't both claim the same
+//     policy: the second sees the first's change and gets "exists" or "conflict".
+//  2. The old chunks stay live until the new ones are committed in one batch
+//     (ingestPolicy), so employees never get a half-published policy.
 export async function publishPolicy(
     deps: RagDeps,
-    input: { form: PolicyForm; source: 'file' | 'form' | 'seed'; fileName?: string; uid: string; policyId?: string },
+    input: {
+        form: PolicyForm
+        source: 'file' | 'form' | 'seed'
+        fileName?: string
+        uid: string
+        policyId?: string // an existing policy's id (edit, seed); new policies get one from the title
+        mode?: PublishMode // default 'replace'
+        expectedVersion?: number // edit only: the version the admin opened
+    },
     ingest: typeof ingestPolicy = ingestPolicy
-): Promise<{ policyId: string; status: 'ready' | 'failed'; chunkCount?: number }> {
+): Promise<PublishResult> {
     // A NEW policy's id comes from its title. An EDITED policy keeps the id it already has,
     // so changing its title updates it rather than creating a second copy.
     const policyId = input.policyId ?? slugify(input.form.title)
     if (!policyId) throw new Error('The policy title has no letters or numbers to make an id from')
     const ref = deps.db.collection(POLICY_COLLECTION).doc(policyId)
+    const mode = input.mode ?? 'replace'
 
-    await ref.set(
-        {
-            policyId,
-            title: input.form.title,
-            form: input.form, // kept so the policy can be opened and edited again later
-            source: input.source,
-            ...(input.fileName ? { fileName: input.fileName } : {}),
-            status: 'processing',
-            updatedBy: input.uid,
-            updatedAt: FieldValue.serverTimestamp(),
-            _schemaVersion: 2, // v1 was Nihal's upload-only row (fileData, no status)
-        },
-        { merge: true }
-    )
+    const claim = await deps.db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref)
+        const existing = snap.data()
+        const version = typeof existing?.version === 'number' ? existing.version : 0
+        if (mode === 'new' && snap.exists) {
+            return {
+                status: 'exists' as const,
+                existingTitle: String(existing?.title ?? existing?.fileName ?? policyId),
+                existingUpdatedAt: existing?.updatedAt?.toDate ? existing.updatedAt.toDate().toISOString() : undefined,
+            }
+        }
+        if (mode === 'edit' && (!snap.exists || version !== (input.expectedVersion ?? 0))) return { status: 'conflict' as const }
+        tx.set(
+            ref,
+            {
+                policyId,
+                title: input.form.title,
+                form: input.form, // kept so the policy can be opened and edited again later
+                source: input.source,
+                ...(input.fileName ? { fileName: input.fileName } : {}),
+                status: 'processing',
+                version: version + 1,
+                updatedBy: input.uid,
+                updatedAt: FieldValue.serverTimestamp(),
+                _schemaVersion: 2, // v1 was Nihal's upload-only row (fileData, no status)
+            },
+            { merge: true }
+        )
+        return { status: 'claimed' as const }
+    })
+    if (claim.status !== 'claimed') return { policyId, ...claim }
 
     try {
         const { chunkCount } = await ingest(deps, { policyId, policyTitle: input.form.title, markdown: formToMarkdown(input.form) })
@@ -72,7 +116,7 @@ export async function deletePolicy(deps: Pick<RagDeps, 'db'>, policyId: string) 
 
 // For the Admin page. select() skips the stored form and any old base64 file data.
 // Rows from the old upload-only version (no status) are listed as "not published".
-export async function listPolicies(deps: Pick<RagDeps, 'db'>): Promise<PolicyListItem[]> {
+export async function listPolicies(deps: Pick<RagDeps, 'db'>, now: () => number = Date.now): Promise<PolicyListItem[]> {
     const snapshot = await deps.db
         .collection(POLICY_COLLECTION)
         .select('policyId', 'title', 'source', 'status', 'chunkCount', 'fileName', 'updatedAt', 'uploadedAt')
@@ -81,7 +125,11 @@ export async function listPolicies(deps: Pick<RagDeps, 'db'>): Promise<PolicyLis
         .map((doc) => {
             const d = doc.data()
             const when = d.updatedAt ?? d.uploadedAt
-            const status: PolicyListItem['status'] = ['processing', 'ready', 'failed'].includes(d.status) ? d.status : 'not-published'
+            let status: PolicyListItem['status'] = ['processing', 'ready', 'failed'].includes(d.status) ? d.status : 'not-published'
+            // Still "processing" long after it started: the publish died half way. Shown as
+            // failed, so the admin knows to publish it again instead of waiting forever.
+            const startedAt = when?.toMillis ? when.toMillis() : undefined
+            if (status === 'processing' && startedAt !== undefined && now() - startedAt > STUCK_AFTER_MS) status = 'failed'
             return {
                 policyId: doc.id,
                 title: String(d.title ?? d.fileName ?? doc.id),
@@ -95,9 +143,11 @@ export async function listPolicies(deps: Pick<RagDeps, 'db'>): Promise<PolicyLis
         .sort((a, b) => a.title.localeCompare(b.title))
 }
 
-// The saved form, for "Edit" on the Admin page. null for old upload-only rows.
-export async function readPolicyForm(deps: Pick<RagDeps, 'db'>, policyId: string): Promise<PolicyForm | null> {
+// The saved form and its version, for "Edit". null for old upload-only rows.
+export async function readPolicyForm(deps: Pick<RagDeps, 'db'>, policyId: string): Promise<{ form: PolicyForm; version: number } | null> {
     const snap = await deps.db.collection(POLICY_COLLECTION).doc(policyId).get()
     const form = snap.exists ? (snap.get('form') as PolicyForm | undefined) : undefined
-    return form ?? null
+    if (!form) return null
+    const version = snap.get('version')
+    return { form, version: typeof version === 'number' ? version : 0 }
 }
