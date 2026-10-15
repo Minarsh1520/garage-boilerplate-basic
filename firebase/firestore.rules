@@ -90,6 +90,9 @@ service cloud.firestore {
     //   escalationCases/{id}    created by the chatbot, read by the Admin page
     //   policyDocuments/{id}    one row per published policy (Admin Policy page)
     //   faqAnswers/{id}         stored answers (Admin Stored Answers page, chatbot)
+    //   chatConversations/{id}  saved Assistant conversations, each owned by one employee,
+    //     /messages/{id}        with their questions and answers. Read and written only by the
+    //                           server, which checks the owner on every request.
     match /employeeData/{uid} {
       allow read, write: if false;
     }
@@ -101,6 +104,12 @@ service cloud.firestore {
     }
     match /faqAnswers/{faqId} {
       allow read, write: if false;
+    }
+    match /chatConversations/{conversationId} {
+      allow read, write: if false;
+      match /messages/{messageId} {
+        allow read, write: if false;
+      }
     }
   }
 }

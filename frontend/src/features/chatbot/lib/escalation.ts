@@ -1,23 +1,13 @@
 import { FieldValue } from 'firebase-admin/firestore'
 import type { RagDeps } from '@/lib/rag/types'
 import type { CaseCategory, Pathway } from '../types'
+import { CASE_TITLES } from './case-titles'
 import { readOwnRecord } from './record'
 
 // The Admin page reads this collection through getEscalationCases() in
 // src/actions/escalation.actions.ts. The field names it reads are: type, title,
 // employeeName, employeeId, summary, status, createdAt. Keep the two files in step.
 export const ESCALATION_COLLECTION = 'escalationCases'
-
-// Shown as the case heading on the Admin page.
-const TITLES: Record<CaseCategory, string> = {
-    complaint: 'Workplace complaint or conflict',
-    wellbeing: 'Wellbeing or personal circumstance',
-    pay: 'Pay or salary matter',
-    'employment-decision': 'Employment decision',
-    'restricted-action': 'Request for an approval or record change',
-    other: 'Needs a person',
-    'no-policy': 'Question not covered by a policy',
-}
 
 // 1 = look at first. A made-up scheme for now: the BA owns the real one. Kept in this
 // one place so changing it never touches anything else.
@@ -79,7 +69,7 @@ export async function createEscalationCase(
     const ref = await collection.add({
         // --- read by the Admin page ---
         type: input.pathway,                      // who should pick it up: HR, IT or Manager
-        title: TITLES[input.category],
+        title: CASE_TITLES[input.category],
         summary: input.question,                  // the employee's own words
         status: 'open',                           // the only status that is true at creation
         createdAt: FieldValue.serverTimestamp(),  // the Admin page sorts on this

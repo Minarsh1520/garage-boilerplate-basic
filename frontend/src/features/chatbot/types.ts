@@ -40,11 +40,15 @@ export const requestEscalationSchema = z.object({
   pathway: z.enum(PATHWAYS),
 })
 
-export const sendChatMessageSchema = z.array(chatTurnSchema).min(1).max(50)
-
-// Extra choices sent with a message. skipFaq is set by the "Get a more detailed answer"
-// button: the stored answer is skipped and the question goes to the AI with the policies.
-export const sendChatOptionsSchema = z.object({ skipFaq: z.boolean().optional() }).optional()
+// What the chat window sends. The conversation's earlier messages are NOT sent: the server
+// reads them from its own saved copy, so it can trust them (the browser could fake them).
+//   conversationId  missing for the first question of a new conversation
+//   skipFaq         set by "Get a more detailed answer": skip the stored answer, ask the AI
+export const sendChatInputSchema = z.object({
+  conversationId: z.string().min(1).max(100).optional(),
+  question: z.string().trim().min(1).max(MAX_QUESTION_LENGTH),
+  skipFaq: z.boolean().optional(),
+})
 
 export type ChatTurn = z.infer<typeof chatTurnSchema>
 
@@ -62,4 +66,27 @@ export interface AssistantReply {
   // True when the text is a stored answer from the Admin FAQ page, not written by the AI.
   // The chat window then offers "Get a more detailed answer".
   fromFaq?: boolean
+  // SERVER ONLY: what the model returned for the conversation list and for follow-ups.
+  // Removed by the server action before the reply goes to the browser.
+  memory?: { title?: string; description?: string; topic?: string }
+}
+
+// One saved message, as the chat window shows it after reopening a conversation.
+export interface SavedMessage {
+  id: string
+  role: 'user' | 'assistant'
+  text: string
+  kind?: AssistantMessageKind
+  sources?: AssistantReply['sources']
+  fromFaq?: boolean
+  createdAt?: string // ISO
+}
+
+// One row in the conversation list.
+export interface ConversationSummary {
+  id: string
+  title: string
+  description?: string
+  updatedAt?: string // ISO
+  messageCount: number
 }

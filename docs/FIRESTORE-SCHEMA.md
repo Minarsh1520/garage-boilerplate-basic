@@ -137,8 +137,9 @@ One document per section of an approved policy. Fields: `policyId`, `policyTitle
 | `form` | `{ title, intro?, sections: { heading, body }[] }` | What was published, so it can be edited again |
 | `source` | `'pdf' \| 'form' \| 'seed'` | How it was added |
 | `fileName` | `string?` | The uploaded PDF's name |
-| `status` | `'processing' \| 'ready' \| 'failed'` | `ready` = in use by the chatbot |
+| `status` | `'processing' \| 'ready' \| 'failed'` | `ready` = in use by the chatbot. A row still `processing` after 5 minutes is shown as failed |
 | `chunkCount` | `number?` | Sections saved to `hrKnowledge` |
+| `version` | `number` | Goes up by one on every publish. Edit sends back the version it opened, so a newer publish by someone else is caught instead of overwritten |
 | `error` | `string?` | Set when `failed` |
 | `updatedBy`, `updatedAt` | `string`, `Timestamp` | |
 | `_schemaVersion` | `2` | v1 rows (`fileData`, no `status`) are shown as "not published" |
@@ -162,3 +163,28 @@ One document per section of an approved policy. Fields: `policyId`, `policyTitle
 | `_schemaVersion` | `1` | |
 
 **Index:** vector index on `embedding`, 768 dimensions, in `firebase/firestore.indexes.json`.
+
+---
+
+## `chatConversations` collection
+
+**Path:** `/chatConversations/{autoId}`, with messages at `/chatConversations/{id}/messages/{autoId}`
+**Written by:** `saveExchange` (`features/chatbot/lib/conversations.ts`), called by `sendChatMessage` after each answer. Never by the browser.
+**Read by:** the Assistant page (`actions/conversation.actions.ts`) for the owner only, and `sendChatMessage` for follow-up questions.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ownerUid` | `string` | The employee the conversation belongs to. Checked on every request |
+| `title` | `string` | Written by the model on the first answer, or the first question shortened; the employee can rename it |
+| `description` | `string?` | One line: topics covered so far, updated by the model each answer |
+| `topic` | `string?` | The last question's policy and subject, used to search follow-up questions |
+| `messageCount` | `number` | Also the next message's `seq` |
+| `summary` | `string?` | "Summarise everything so far": written by the AI, saved only after the employee approved the preview. Used instead of `description` as the conversation's key points |
+| `summarisedAtCount` | `number?` | `messageCount` when the summary was saved |
+| `pendingSummary` | `string?` | A summary preview waiting for approval; removed on Save or Discard |
+| `createdAt`, `updatedAt` | `Timestamp` | |
+| `_schemaVersion` | `1` | |
+
+**Message fields:** `seq` (order), `role` (`user` or `assistant`), `text`, and for answers `kind`, `sources`, `fromFaq`. Errors are not saved.
+
+**Privacy (pending the BA/PM's decision):** kept until the employee deletes the conversation; admins have no page for them.

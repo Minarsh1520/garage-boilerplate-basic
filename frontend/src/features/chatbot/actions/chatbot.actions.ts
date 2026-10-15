@@ -5,42 +5,83 @@ import type { ActionResult } from '@/types'
 import { getRagDeps } from '@/lib/rag/server'
 import type { RagDeps } from '@/lib/rag/types'
 import { adminDb } from '@/lib/firebase/admin'
-import { MAX_QUESTION_LENGTH, requestEscalationSchema, sendChatMessageSchema, sendChatOptionsSchema, type AssistantReply } from '@/features/chatbot/types'
+import { MAX_QUESTION_LENGTH, requestEscalationSchema, sendChatInputSchema, type AssistantReply, type ChatTurn } from '@/features/chatbot/types'
+import { getOwnedConversation, readMessages, RECENT_MESSAGES_READ, saveExchange, toExchanges } from '@/features/chatbot/lib/conversations'
 import { createEscalationCase, MAX_CASES_PER_DAY } from '@/features/chatbot/lib/escalation'
 import { StageError } from '@/features/chatbot/lib/errors'
 import { pickQuestion } from '@/features/chatbot/lib/history'
 import { answerQuestion, errorReply } from '@/features/chatbot/lib/pipeline'
 import { matchSensitiveRule } from '@/features/chatbot/lib/rules'
 
-// Thin wrapper: who is asking, and what did they ask. All the answering logic lives in
-// lib/pipeline.ts so it can be tested and probed without Next.js.
-export async function sendChatMessage(history: unknown, options?: unknown): Promise<ActionResult<AssistantReply>> {
+export interface ChatResponse {
+  reply: AssistantReply
+  conversationId?: string // missing only if saving failed; the answer is still shown
+  title?: string
+  assistantMessageId?: string
+}
+
+// Thin wrapper: who is asking, what they asked, and in which conversation. All the
+// answering logic lives in lib/pipeline.ts so it can be tested without Next.js.
+export async function sendChatMessage(input: unknown): Promise<ActionResult<ChatResponse>> {
   const session = await requireAuth()
 
-  const parsed = sendChatMessageSchema.safeParse(history)
+  const parsed = sendChatInputSchema.safeParse(input)
   if (!parsed.success) {
     // Say WHY it was rejected. "Please enter a question" for an over-long question is misleading.
-    const tooLong = parsed.error.issues.some((issue) => issue.code === 'too_big' && issue.path.at(-1) === 'text')
+    const tooLong = parsed.error.issues.some((issue) => issue.code === 'too_big' && issue.path.at(-1) === 'question')
     return {
       success: false,
       error: tooLong ? `Your question is too long. Please keep it under ${MAX_QUESTION_LENGTH} characters.` : 'Please enter a question.',
     }
   }
-  const { question, earlierQuestion } = pickQuestion(parsed.data)
-  if (!question) return { success: false, error: 'Please enter a question.' }
+  const { question, skipFaq, conversationId } = parsed.data
+
+  // The conversation must belong to whoever is signed in. Someone else's id is treated as missing.
+  const conversation = conversationId ? await getOwnedConversation(adminDb, session.uid, conversationId) : null
+  if (conversationId && !conversation) return { success: false, error: 'That conversation could not be found. Please start a new one.' }
 
   let deps: RagDeps
   try {
     deps = getRagDeps()
   } catch (error) {
     // e.g. GEMINI_API_KEY missing. Logged as APP-CONFIG; the employee never sees the detail.
-    return { success: true, data: errorReply(new StageError('setup', error)) }
+    return { success: true, data: { reply: errorReply(new StageError('setup', error)), conversationId } }
   }
 
-  // Bad options are ignored rather than rejected: the worst case is the stored answer is shown.
-  const skipFaq = sendChatOptionsSchema.safeParse(options).data?.skipFaq
+  // Earlier messages come from the server's own saved copy, never from the browser.
+  const recent = conversation ? await readMessages(adminDb, conversation.id, { last: RECENT_MESSAGES_READ }) : []
+  const turns: ChatTurn[] = [
+    ...recent.map((m) => (m.role === 'user' ? { role: 'user' as const, text: m.text } : { role: 'assistant' as const, text: m.text, kind: m.kind })),
+    { role: 'user', text: question },
+  ]
+  const { earlierQuestion } = pickQuestion(turns)
 
-  return { success: true, data: await answerQuestion(deps, { uid: session.uid, question, earlierQuestion, skipFaq }) }
+  const { memory, ...reply } = await answerQuestion(deps, {
+    uid: session.uid,
+    question,
+    earlierQuestion,
+    skipFaq,
+    conversation: {
+      isFirstTurn: !conversation,
+      // A summary the employee asked for is fuller than the one-line description, so it wins.
+      keyPoints: conversation?.summary ?? conversation?.description,
+      topic: conversation?.topic,
+      recent: toExchanges(recent),
+    },
+  })
+
+  // Errors aren't saved: the question gets "Try again", and saving it would leave a
+  // question with no answer in the history.
+  if (reply.kind === 'error') return { success: true, data: { reply, conversationId } }
+
+  try {
+    const saved = await saveExchange(adminDb, { uid: session.uid, conversation, question, reply: { ...reply, memory } })
+    return { success: true, data: { reply, ...saved } }
+  } catch (error) {
+    // The employee still gets the answer; only the history is missing it.
+    console.error('[chat] DB-HISTORY side=app stage=save', error)
+    return { success: true, data: { reply, conversationId } }
+  }
 }
 
 // Called when the employee presses "Send to HR team". This is the only way a case is

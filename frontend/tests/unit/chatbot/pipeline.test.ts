@@ -180,4 +180,24 @@ const ALEX = {
         expect(reply.kind).toBe('fallback')
         expect(reply.text).toMatch(/no approved onboarding information/)
     })
+
+    // ---- Saved conversations ----
+    it('searches a short follow-up together with the previous topic, and skips stored answers for it', async () => {
+        const { deps, embedContent } = fakeDeps({ faqHits: [FAQ], decision: { outcome: 'answer', text: 'Pro-rata.' } })
+        const reply = await answerQuestion(deps, { uid: 'u1', question: 'And for part-timers?', conversation: { topic: 'Leave Policy: leave types', isFirstTurn: false } })
+        expect(reply.fromFaq).toBeUndefined()
+        expect(embedContent).toHaveBeenCalledWith(expect.objectContaining({ contents: 'And for part-timers? (Leave Policy: leave types)' }))
+    })
+
+    it('does not add the old topic to a question that has moved on', async () => {
+        const { deps, embedContent } = fakeDeps({ decision: { outcome: 'answer', text: 'At 10 am.' } })
+        await answerQuestion(deps, { uid: 'u1', question: 'How do I set up my IT account?', conversation: { topic: 'Leave Policy: leave types', isFirstTurn: false } })
+        expect(embedContent).toHaveBeenCalledWith(expect.objectContaining({ contents: 'How do I set up my IT account?' }))
+    })
+
+    it('returns the title, description and topic the model wrote, for the conversation list', async () => {
+        const { deps } = fakeDeps({ decision: { outcome: 'answer', text: 'Yes.', title: 'Leave approval', description: 'Leave approval times.', topic: 'Leave Policy: approval' } })
+        expect((await ask(deps, 'How long does approval take?')).memory).toEqual({ title: 'Leave approval', description: 'Leave approval times.', topic: 'Leave Policy: approval' })
+    })
 })
+

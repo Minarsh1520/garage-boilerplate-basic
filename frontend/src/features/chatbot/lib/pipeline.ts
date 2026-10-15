@@ -5,8 +5,9 @@ import { searchPolicies, type RetrievedChunk } from '@/lib/rag/retrieve'
 import { withRetry } from '@/lib/rag/retry'
 import type { RagDeps } from '@/lib/rag/types'
 import type { AssistantReply, CaseCategory, Pathway } from '../types'
-import { buildPrompt, DECISION_JSON_SCHEMA, parseDecision, SYSTEM_PROMPT, wasBlocked } from './decision'
+import { buildPrompt, DECISION_JSON_SCHEMA, parseDecision, SYSTEM_PROMPT, wasBlocked, type ConversationContext, type Decision } from './decision'
 import { atStage, classifyError } from './errors'
+import { isFollowUp } from './follow-up'
 import { formatRecord, readOwnRecord } from './record'
 import { matchSensitiveRule } from './rules'
 
@@ -68,9 +69,16 @@ export function errorReply(error: unknown): AssistantReply {
 
 export async function answerQuestion(
     deps: RagDeps,
-    input: { uid: string; question: string; earlierQuestion?: string; skipFaq?: boolean }
+    input: {
+        uid: string
+        question: string
+        earlierQuestion?: string
+        skipFaq?: boolean
+        // The saved conversation so far (server-side copy). Missing for a new conversation.
+        conversation?: ConversationContext & { topic?: string }
+    }
 ): Promise<AssistantReply> {
-    const { uid, question, earlierQuestion, skipFaq } = input
+    const { uid, question, earlierQuestion, skipFaq, conversation } = input
 
   // 1. Obvious sensitive matters → human, with zero model calls.
     const rule = matchSensitiveRule(question)
@@ -78,14 +86,17 @@ export async function answerQuestion(
 
     try {
     // 2. Embed the question ONCE. The same vector is used for the stored-answer check and
-    //    the policy search. A follow-up is searched together with the question it follows up on.
-    const searchText = earlierQuestion ? `${earlierQuestion} ${question}` : question
+    //    the policy search. A reply to a clarifying question is searched together with the
+    //    question it clarifies; a short follow-up ("and for part-timers?") is searched together
+    //    with the previous question's topic, so it finds the same policy.
+    const followUpTopic = !earlierQuestion && conversation?.topic && isFollowUp(question) ? conversation.topic : undefined
+    const searchText = earlierQuestion ? `${earlierQuestion} ${question}` : followUpTopic ? `${question} (${followUpTopic})` : question
     const queryVector = await atStage('search', () => embedText(deps.ai, searchText, 'RETRIEVAL_QUERY'))
 
     // 3. Stored answers first. Skipped for follow-ups to a clarifying question (the stored
     //    answer was written for a stand-alone question) and when the employee asked for more detail.
     //    No close match → carry on to the AI below, which may only use the policies it is given.
-    if (!skipFaq && !earlierQuestion) {
+    if (!skipFaq && !earlierQuestion && !followUpTopic) {
         // A failed FAQ lookup (e.g. its index not deployed yet) must not stop the chat:
         // log it and let the AI answer instead.
         const faq = await matchFaq(deps, queryVector).catch((error) => {
@@ -94,7 +105,7 @@ export async function answerQuestion(
         })
         if (faq) {
             const sources = faq.policyTitle ? [{ policyTitle: faq.policyTitle, headingPath: faq.policyTitle }] : []
-            return reply('answer', faq.answer, { sources, fromFaq: true })
+            return reply('answer', faq.answer, { sources, fromFaq: true, memory: { topic: faq.policyTitle ? `${faq.policyTitle}: ${faq.question}` : faq.question } })
         }
     }
 
@@ -116,7 +127,7 @@ export async function answerQuestion(
       // Two attempts, not three: a failed call can take ~9s to come back, and the employee is watching a spinner.
         withRetry(() => deps.ai.models.generateContent({
         model: GEN_MODEL,
-        contents: buildPrompt({ question, earlierQuestion, policies, record: record ? formatRecord(record) : 'not available' }),
+        contents: buildPrompt({ question, earlierQuestion, policies, record: record ? formatRecord(record) : 'not available', conversation }),
         config: {
             systemInstruction: SYSTEM_PROMPT,
             temperature: 0,
@@ -131,15 +142,29 @@ export async function answerQuestion(
 
     const decision = parseDecision(response.text)
 
-    // 6. CODE decides what each outcome means for the employee.
+    // 6. CODE decides what each outcome means for the employee. The memory fields ride along
+    //    for the conversation list and follow-ups; the server action strips them off.
+    const memory = {
+        title: decision.title?.trim() || undefined,
+        description: decision.description?.trim() || undefined,
+        topic: decision.topic?.trim() || undefined,
+    }
+    return { ...replyFor(decision, hits, earlierQuestion), memory }
+    } catch (error) {
+        return errorReply(error)
+    }
+}
+
+// What each model outcome means for the employee.
+function replyFor(decision: Decision, hits: RetrievedChunk[], earlierQuestion: string | undefined): AssistantReply {
     switch (decision.outcome) {
         case 'answer':
             return reply('answer', decision.text ?? '', { sources: toSources(hits) })
         case 'clarify':
             // Only ONE clarifying question per topic. Unclear again → stop asking and offer ready-made questions.
             return earlierQuestion
-            ? reply('fallback', UNCLEAR_MESSAGE, { suggestions: SUGGESTED_QUESTIONS })
-            : reply('clarify', decision.text ?? '')
+                ? reply('fallback', UNCLEAR_MESSAGE, { suggestions: SUGGESTED_QUESTIONS })
+                : reply('clarify', decision.text ?? '')
         case 'record_unavailable':
             return reply('fallback', RECORD_UNAVAILABLE_MESSAGE, { escalationOffer: { category: 'other', pathway: 'HR' } })
         case 'off_topic':
@@ -148,8 +173,5 @@ export async function answerQuestion(
             return escalate(decision.pathway ?? 'HR', decision.category ?? 'other')
         case 'not_found':
             return reply('fallback', NOT_FOUND_MESSAGE, { escalationOffer: { category: 'no-policy', pathway: 'HR' } })
-        }
-    } catch (error) {
-        return errorReply(error)
     }
 }
