@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { getServerSession } from '@/actions/auth.actions'
 import { getEmployeeOnboarding } from '@/lib/onboarding'
+import { HelpMenu } from '@/components/HelpMenu'
 import { ui } from '@/lib/theme'
 
 export const metadata: Metadata = { title: 'Profile' }
@@ -11,7 +12,6 @@ function formatDate(date?: string) { return date ? new Date(`${date}T00:00:00`).
 export default async function ProfilePage() {
   const session = await getServerSession()
   const onboarding = session?.uid ? await getEmployeeOnboarding(session.uid) : null
-
   const name = onboarding?.employeeName ?? session?.email ?? 'Employee'
   const initials = name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
   const totalTasks = onboarding?.checklist?.length ?? 0
@@ -21,8 +21,13 @@ export default async function ProfilePage() {
 
   return (
     <div className={ui.page}>
-      <h1 className={ui.pageTitle}>Profile</h1>
-      <p className={ui.pageDescription}>View your personal and onboarding details.</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className={ui.pageTitle}>Profile</h1>
+          <p className={ui.pageDescription}>View your personal and onboarding details.</p>
+        </div>
+        <HelpMenu />
+      </div>
 
       <div className="mt-6 max-w-6xl">
         <div className={`p-6 ${ui.card}`}>
@@ -69,14 +74,12 @@ export default async function ProfilePage() {
           <div className="space-y-5">
             <div className={`p-6 ${ui.card}`}>
               <h2 className="text-lg font-bold text-[#222222]">Onboarding Summary</h2>
-
               <p className="mt-4 text-3xl font-bold text-[#4361AB]">{progress}%</p>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-200"><div className="h-full rounded-full bg-[#4361AB]" style={{ width: `${progress}%` }} /></div>
               <p className="mt-3 text-sm text-zinc-600">{completedTasks} of {totalTasks} tasks completed</p>
 
               <div className="mt-6 border-t border-gray-200 pt-5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Next Task</p>
-
                 {nextTask ? (
                   <>
                     <p className="mt-2 text-sm font-semibold text-[#222222]">{nextTask.title}</p>
@@ -85,12 +88,6 @@ export default async function ProfilePage() {
                   </>
                 ) : <p className="mt-2 text-sm text-zinc-600">All onboarding tasks completed.</p>}
               </div>
-            </div>
-
-            <div className={`p-6 ${ui.card}`}>
-              <h2 className="text-lg font-bold text-[#222222]">Need Help?</h2>
-              <p className="mt-2 text-sm text-zinc-600">Replay the app guide or get help using the onboarding portal.</p>
-              <button type="button" className="mt-4 rounded bg-[#4361AB] px-4 py-2 text-sm font-semibold text-white hover:bg-[#36509A]">Help</button>
             </div>
           </div>
         </div>
