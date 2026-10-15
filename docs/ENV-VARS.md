@@ -35,9 +35,8 @@ pnpm run env:sync       # also runs automatically before `pnpm run dev`
 | `CORS_ORIGIN` | No | No | Allowed CORS origin for the API (empty = deny all cross-origin) |
 | `PORT` | No | No | Local Functions dev server port (default `5001`) |
 | `STITCH_API_KEY` | **Yes** | No | Google Stitch key for the Claude Code MCP (stays in root `.env` only) |
-| `GEMINI_API_KEY` | **Yes** | Yes (for the chatbot) | Google AI (Gemini) API key, used only in the chatbot's Server Action — server-only, never sent to the browser |
+| `GEMINI_API_KEY` | **Yes** | Yes (for the chatbot) | Google AI (Gemini) API key(s), can be one or several separate by comma (,), used only in the chatbot's Server Action — server-only, never sent to the browser |
 | `GEMINI_MODEL` | No | No | Gemini model id to call (default `gemini-3.6-flash`). Kept config-driven since the free-tier model lineup has already changed more than once |
-| `GEMINI_API_KEYS` | **Yes** | No (falls back to `GEMINI_API_KEY`) | Comma-separated Gemini API keys, tried in order when one runs out. Keys from the same Google project share one allowance, so only keys from different projects add capacity. Server-only |
 | `GEMINI_FALLBACK_MODELS` | No | No | Comma-separated generation models tried after `GEMINI_MODEL` once every key has run out on it. Never applies to the embedding model |
 | `FAQ_DISTANCE_THRESHOLD` | No | No | How close a question must be to a stored answer for it to be shown, as cosine distance (0 = identical). Default `0.15`. Lower = stricter |
 | `RAG_DISTANCE_THRESHOLD` | No | No (defaults to `0.38`) | Maximum cosine distance (0 = identical) for a policy chunk to count as relevant to a chatbot question. Lower is stricter; questions with no chunk within this distance get the fallback reply. Tune it by running `frontend/scripts/probe-rag.ts` after changing the policies. Synced to the frontend by `env:sync`; server-only, never `NEXT_PUBLIC_`. |
