@@ -8,6 +8,8 @@ export const CASE_TITLES: Record<CaseCategory, string> = {
     pay: 'Pay or salary matter',
     'employment-decision': 'Employment decision',
     'restricted-action': 'Request for an approval or record change',
+    'system-access': 'System access problem',
+    'onboarding-task': 'Onboarding task or document',
     other: 'Needs a person',
     'no-policy': 'Question not covered by a policy',
 }
