@@ -5,13 +5,14 @@ import type { ActionResult } from '@/types'
 import { getRagDeps } from '@/lib/rag/server'
 import type { RagDeps } from '@/lib/rag/types'
 import { adminDb } from '@/lib/firebase/admin'
-import { MAX_QUESTION_LENGTH, requestEscalationSchema, sendChatInputSchema, type AssistantReply, type ChatTurn } from '@/features/chatbot/types'
+import { completeTaskSchema, MAX_QUESTION_LENGTH, requestEscalationSchema, sendChatInputSchema, type AssistantReply, type ChatTurn } from '@/features/chatbot/types'
 import { getOwnedConversation, readMessages, RECENT_MESSAGES_READ, saveExchange, toExchanges } from '@/features/chatbot/lib/conversations'
 import { createEscalationCase, MAX_CASES_PER_DAY } from '@/features/chatbot/lib/escalation'
 import { StageError } from '@/features/chatbot/lib/errors'
 import { pickQuestion } from '@/features/chatbot/lib/history'
 import { answerQuestion, errorReply } from '@/features/chatbot/lib/pipeline'
 import { matchSensitiveRule } from '@/features/chatbot/lib/rules'
+import { completeOwnTask } from '@/features/chatbot/lib/task-completion'
 
 export interface ChatResponse {
   reply: AssistantReply
@@ -111,12 +112,41 @@ export async function requestEscalation(input: unknown): Promise<ActionResult<{ 
       case 'daily-limit':
         return {
           success: false,
-          error: `You have sent ${MAX_CASES_PER_DAY} questions to the HR team today, which is the daily limit. The HR team will reply to those first. If this is urgent, please contact HR directly.`,
+          error: `You have sent ${MAX_CASES_PER_DAY} non-urgent requests to the HR team in the last 24 hours, which is the limit, so this one was not sent. The HR team will reply to those first. Urgent or sensitive matters can still be sent, and you can always contact HR directly.`,
         }
     }
   } catch (error) {
     // Full detail stays in the server log (SECURITY.md); the employee is told it was NOT sent.
     console.error('[chat] DB-ESCALATION side=app stage=escalation', error)
     return { success: false, error: 'Your question could not be sent to the HR team. Please contact HR directly. (Ref: DB-ESCALATION)' }
+  }
+}
+
+// Called when the employee presses Confirm on "Mark task completed". The only way the
+// assistant changes a checklist. The task is looked up again in the employee's OWN record
+// (uid from the session) and every check from the offer is repeated, because the browser
+// could send any id. What the employee is told comes from the result of the save.
+export async function completeMyTask(input: unknown): Promise<ActionResult<{ title: string }>> {
+  const session = await requireAuth()
+  const parsed = completeTaskSchema.safeParse(input)
+  if (!parsed.success) return { success: false, error: 'That task could not be found. Nothing was changed.' }
+
+  try {
+    const result = await completeOwnTask({ db: adminDb }, session.uid, parsed.data.taskId)
+    switch (result.status) {
+      case 'ok':
+        return { success: true, data: { title: result.title ?? parsed.data.taskId } }
+      case 'already-completed':
+        return { success: false, error: `"${result.title}" was already marked as completed. Nothing was changed.` }
+      case 'not-allowed':
+        return { success: false, error: `"${result.title}" can't be marked done from the Assistant. Nothing was changed.` }
+      case 'no-record':
+        return { success: false, error: "Your onboarding record couldn't be found. Nothing was changed. Please contact HR." }
+      case 'not-found':
+        return { success: false, error: 'That task is not on your checklist. Nothing was changed.' }
+    }
+  } catch (error) {
+    console.error('[chat] DB-TASK side=app stage=complete-task', error)
+    return { success: false, error: 'The task could not be updated. Nothing was changed. Please try again later. (Ref: DB-TASK)' }
   }
 }

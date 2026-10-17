@@ -15,6 +15,14 @@ export const SENSITIVE_RULES: SensitiveRule[] = [
   // match: that is a policy question. Pathway is Manager because the leave policy
   // says the manager approves leave.
   { pattern: /\b(approve|sign off|accept)\s+(my|this|the)\s+(\w+\s+)?leave\b/i, category: 'restricted-action', pathway: 'Manager' },
+  // Asking the assistant to CHANGE payroll, bank, super or tax details (BA: not allowed;
+  // point to the approved HR/payroll process). "How do I update my bank details?" must NOT
+  // match: explaining the process is a policy question the assistant can answer.
+  {
+    pattern: /\b(can|could|would|will) you\b[^.?!]{0,30}\b(update|change|edit|correct)\b[^.?!]{0,30}\b(bank|payroll|super(annuation)?|tax)\b|\bplease\s+(update|change|edit|correct)\b[^.?!]{0,30}\b(bank|payroll|super(annuation)?|tax)\b/i,
+    category: 'restricted-action',
+    pathway: 'HR',
+  },
 ]
 
 export function matchSensitiveRule(question: string): SensitiveRule | null {

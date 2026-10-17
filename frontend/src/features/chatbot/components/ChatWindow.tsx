@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
+import Link from 'next/link'
 import { Send, Square } from 'lucide-react'
 import { toast } from 'sonner'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { cn, formatDatetime } from '@/lib/utils'
-import { requestEscalation, sendChatMessage } from '@/features/chatbot/actions/chatbot.actions'
+import { completeMyTask, requestEscalation, sendChatMessage } from '@/features/chatbot/actions/chatbot.actions'
 import {
   approveConversationSummary,
   deleteMyConversation,
@@ -41,6 +42,10 @@ interface Message {
   // An offer to send the question to the HR team, with the question it refers to.
   // Removed once the employee answers it, so it can't be sent twice.
   offer?: NonNullable<AssistantReply['escalationOffer']> & { question: string }
+  // An offer to mark one of the employee's own tasks as completed. Removed once answered.
+  taskOffer?: AssistantReply['taskOffer']
+  // Links to app pages, chosen by the server from a fixed list.
+  links?: AssistantReply['links']
 }
 
 // Shared look for the small buttons under a message.
@@ -317,6 +322,8 @@ export function ChatWindow() {
         suggestions: reply.suggestions,
         faqQuestion: reply.fromFaq ? question : undefined,
         offer: reply.escalationOffer ? { ...reply.escalationOffer, question } : undefined,
+        taskOffer: reply.taskOffer,
+        links: reply.links,
       })
 
       // Lets the app tour move on once the first answer is on screen.
@@ -337,10 +344,48 @@ export function ChatWindow() {
 
   // "Send to HR team" first shows a PREVIEW of exactly what the HR team will see, which the
   // employee can edit (for example to leave out a detail). Nothing is created until they
-  // approve it. The server re-checks everything on its side when it saves.
+  // confirm it. The server re-checks everything on its side when it saves.
+  // The description starts as the AI's draft of the request, or the employee's own words
+  // when there is no draft (a sensitive-rule match makes no AI call).
   function openCasePreview(message: Message) {
     if (!message.offer || isPending) return
-    setCasePreview({ messageId: message.id, question: message.offer.question })
+    setCasePreview({ messageId: message.id, question: message.offer.draft ?? message.offer.question })
+  }
+
+  // "Mark task completed" (BA: restricted, only through the app's validated process).
+  // Confirm is the ONLY thing that changes the checklist; the server checks the task again
+  // and what the employee is told comes from the result of that save.
+  async function confirmTask(message: Message) {
+    if (!message.taskOffer || isPending) return
+    const { taskId } = message.taskOffer
+    closeTaskOffer(message.id)
+    setIsPending(true)
+    try {
+      const result = await completeMyTask({ taskId })
+      if (result.success && result.data) {
+        addAssistantMessage({
+          kind: 'answer',
+          text: `Done: "${result.data.title}" is now marked as completed on your onboarding checklist.`,
+          links: [{ label: 'Open my checklist', href: '/dashboard' }],
+        })
+      } else {
+        addAssistantMessage({ kind: 'error', text: result.error ?? 'The task could not be updated. Nothing was changed.' })
+      }
+    } catch {
+      toast.error('Could not reach the server. The task was not changed.')
+    } finally {
+      setIsPending(false)
+    }
+  }
+
+  // Cancel changes nothing on the server: the offer is just taken away.
+  function cancelTask(message: Message) {
+    closeTaskOffer(message.id)
+    addAssistantMessage({ kind: 'answer', text: 'Cancelled. Nothing was changed on your checklist.' })
+  }
+
+  function closeTaskOffer(messageId: string) {
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, taskOffer: undefined } : m)))
   }
 
   // Approving the preview: this is the ONLY thing that creates a case. What the employee is
@@ -362,8 +407,8 @@ export function ChatWindow() {
         addAssistantMessage({
           kind: 'escalate',
           text: result.data.alreadySent
-            ? `You already sent this question to the HR team today, so it was not sent again. Reference: ${result.data.caseId}`
-            : `Your question has been sent to the HR team to review. Reference: ${result.data.caseId}`,
+            ? `You already sent this request to the HR team today, so it was not sent again. Reference: ${result.data.caseId}`
+            : `Your request has been sent to the HR team to review. Reference: ${result.data.caseId}`,
         })
       } else {
         addAssistantMessage({
@@ -471,22 +516,22 @@ export function ChatWindow() {
                 </div>
               )}
 
-              {/* The preview: what will be sent, editable, and only sent on approval. */}
+              {/* The preview (BA: action, data used and destination), editable, sent only on Confirm. */}
               {message.offer && casePreview?.messageId === message.id && (
                 <div className="mt-2 w-full max-w-[85%] rounded-md border border-[#4361AB] bg-white p-3 text-sm text-[#222222] sm:max-w-[75%]">
-                  <p className="font-semibold">Check before sending</p>
+                  <p className="font-semibold">Submit this request?</p>
                   <dl className="mt-2 space-y-1 text-xs">
                     <div>
-                      <dt className="inline font-semibold">Goes to: </dt>
-                      <dd className="inline">{PATHWAY_NAMES[message.offer.pathway]}</dd>
+                      <dt className="inline font-semibold">Category: </dt>
+                      <dd className="inline">{CASE_TITLES[message.offer.category]}</dd>
                     </div>
                     <div>
-                      <dt className="inline font-semibold">Case type: </dt>
-                      <dd className="inline">{CASE_TITLES[message.offer.category]}</dd>
+                      <dt className="inline font-semibold">Recipient: </dt>
+                      <dd className="inline">{PATHWAY_NAMES[message.offer.pathway]}</dd>
                     </div>
                   </dl>
                   <label className="mt-2 block text-xs font-semibold">
-                    Your question, as the HR team will see it (you can edit it)
+                    Description, as the HR team will see it (you can edit it)
                     <textarea
                       value={casePreview.question}
                       onChange={(e) => setCasePreview({ messageId: message.id, question: e.target.value })}
@@ -495,6 +540,9 @@ export function ChatWindow() {
                       className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm font-normal text-[#222222]"
                     />
                   </label>
+                  {message.offer.draft && (
+                    <p className="mt-1 text-xs text-gray-600">The Assistant wrote this from your message. Check it says what you mean.</p>
+                  )}
                   <p className="mt-1 text-xs text-gray-600">
                     Also included: your name and employee ID from your onboarding record, so the HR team knows who to reply to.
                   </p>
@@ -505,12 +553,56 @@ export function ChatWindow() {
                       disabled={isPending || !casePreview.question.trim()}
                       className="rounded-full bg-[#4361AB] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
                     >
-                      Send to HR team
+                      Confirm
                     </button>
                     <button type="button" onClick={() => setCasePreview(null)} disabled={isPending} className={CHIP_BUTTON}>
                       Cancel
                     </button>
                   </div>
+                </div>
+              )}
+
+              {/* "Mark task completed" preview: what changes, where, and only on Confirm. */}
+              {message.taskOffer && (
+                <div className="mt-2 w-full max-w-[85%] rounded-md border border-[#4361AB] bg-white p-3 text-sm text-[#222222] sm:max-w-[75%]">
+                  <p className="font-semibold">Mark this task as completed?</p>
+                  <dl className="mt-2 space-y-1 text-xs">
+                    <div>
+                      <dt className="inline font-semibold">Task: </dt>
+                      <dd className="inline">{message.taskOffer.taskTitle}</dd>
+                    </div>
+                    <div>
+                      <dt className="inline font-semibold">Change: </dt>
+                      <dd className="inline">Pending → Completed, on your onboarding checklist (Home page)</dd>
+                    </div>
+                  </dl>
+                  <p className="mt-1 text-xs text-gray-600">
+                    Only confirm if you have finished it. The HR team can see your checklist.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void confirmTask(message)}
+                      disabled={isPending}
+                      className="rounded-full bg-[#4361AB] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                    >
+                      Confirm
+                    </button>
+                    <button type="button" onClick={() => cancelTask(message)} disabled={isPending} className={CHIP_BUTTON}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Links to app pages. The addresses come from the server's fixed list. */}
+              {message.links && message.links.length > 0 && (
+                <div className="mt-2 flex max-w-[85%] flex-wrap gap-2 sm:max-w-[75%]">
+                  {message.links.map((link) => (
+                    <Link key={link.href} href={link.href} className={CHIP_BUTTON}>
+                      {link.label}
+                    </Link>
+                  ))}
                 </div>
               )}
 

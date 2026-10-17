@@ -199,5 +199,71 @@ const ALEX = {
         const { deps } = fakeDeps({ decision: { outcome: 'answer', text: 'Yes.', title: 'Leave approval', description: 'Leave approval times.', topic: 'Leave Policy: approval' } })
         expect((await ask(deps, 'How long does approval take?')).memory).toEqual({ title: 'Leave approval', description: 'Leave approval times.', topic: 'Leave Policy: approval' })
     })
-})
 
+    // ---- Onboarding actions (BA automation rules) ----
+    const ALEX_TASKS = {
+        employeeName: 'Alex Chen',
+        startDate: '2026-09-14',
+        checklist: [
+            { id: 'super', title: 'Super Fund Nomination', status: 'pending', duein: '28 days from your start date' },
+            { id: 'tfn', title: 'TFN Declaration', status: 'completed', duein: 'Before your first day' },
+            { id: 'it-account', title: 'IT Account', status: 'pending', duein: 'Your first day' },
+        ],
+    }
+
+    it("offers to mark a task done only after checking it against the employee's own record", async () => {
+        const { deps } = fakeDeps({ record: ALEX_TASKS, decision: { outcome: 'answer', text: 'Marked!', complete_task: 'super fund nomination' } })
+        const reply = await ask(deps, 'I have nominated my super fund')
+        expect(reply.taskOffer).toEqual({ taskId: 'super', taskTitle: 'Super Fund Nomination' })
+        // The wording is written by code, never the model's "Marked!": nothing has changed yet.
+        expect(reply.text).toMatch(/confirm/i)
+        expect(reply.text).not.toMatch(/Marked!/)
+    })
+
+    it.each([
+        ['TFN Declaration', /already marked as completed/],
+        ['IT Account', /can't be marked done/],
+        ['Payroll setup', /couldn't find that task/],
+    ])('explains instead of offering when the task is %s', async (title, message) => {
+        const { deps } = fakeDeps({ record: ALEX_TASKS, decision: { outcome: 'answer', text: 'Done!', complete_task: title } })
+        const reply = await ask(deps, `I finished ${title}`)
+        expect(reply.taskOffer).toBeUndefined()
+        expect(reply.text).toMatch(message)
+    })
+
+    it('links to the checklist only when the model picks that page, using an address from code', async () => {
+        const withLink = fakeDeps({ decision: { outcome: 'answer', text: 'Three tasks are pending.', page: 'checklist' } })
+        expect((await ask(withLink.deps, 'What do I still need to do?')).links).toEqual([{ label: 'Open my checklist', href: '/dashboard' }])
+        const unknownPage = fakeDeps({ decision: { outcome: 'answer', text: 'Your manager approves it.', page: 'https://evil.example' } })
+        const reply = await ask(unknownPage.deps, 'How does leave approval work?')
+        expect(reply.kind).toBe('answer') // a bad page name doesn't spoil the answer
+        expect(reply.links).toBeUndefined()
+    })
+
+    it('passes the AI-drafted request into the preview offer', async () => {
+        const decision = { outcome: 'escalate', category: 'system-access', pathway: 'IT', request_draft: 'I need access to the onboarding system to complete my tasks.' }
+        const { deps } = fakeDeps({ decision })
+        expect((await ask(deps, 'I cannot get into the onboarding system')).escalationOffer).toEqual({
+            category: 'system-access',
+            pathway: 'IT',
+            draft: 'I need access to the onboarding system to complete my tasks.',
+        })
+    })
+
+    it('points a payroll or bank change request to the HR process, without calling the model', async () => {
+        const { deps, generateContent } = fakeDeps({})
+        const reply = await ask(deps, 'Can you update my bank details?')
+        expect(reply).toMatchObject({ kind: 'escalate', escalationOffer: { category: 'restricted-action', pathway: 'HR' } })
+        expect(reply.text).toMatch(/approved HR or payroll process/)
+        expect(generateContent).not.toHaveBeenCalled()
+    })
+
+    it("gives the model today's date and the worked-out due dates, soonest first", async () => {
+        const { deps, generateContent } = fakeDeps({ record: ALEX_TASKS, decision: { outcome: 'answer', text: 'Super is overdue.' } })
+        await answerQuestion(deps, { uid: 'u1', question: 'What is most urgent?', today: '2026-10-17' })
+        const prompt = (generateContent.mock.calls[0] as unknown as [{ contents: string }])[0].contents
+        expect(prompt).toContain('TODAY: 2026-10-17')
+        expect(prompt).toContain('- IT Account: pending (due: Your first day, 2026-09-14, overdue by 33 days)')
+        expect(prompt.indexOf('IT Account')).toBeLessThan(prompt.indexOf('Super Fund Nomination'))
+    })
+})

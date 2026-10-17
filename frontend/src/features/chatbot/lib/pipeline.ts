@@ -6,10 +6,12 @@ import { withRetry } from '@/lib/rag/retry'
 import type { RagDeps } from '@/lib/rag/types'
 import type { AssistantReply, CaseCategory, Pathway } from '../types'
 import { buildPrompt, DECISION_JSON_SCHEMA, parseDecision, SYSTEM_PROMPT, wasBlocked, type ConversationContext, type Decision } from './decision'
+import { todayIn } from './due-dates'
 import { atStage, classifyError } from './errors'
 import { isFollowUp } from './follow-up'
-import { formatRecord, readOwnRecord } from './record'
+import { formatRecord, readOwnRecord, type EmployeeRecord } from './record'
 import { matchSensitiveRule } from './rules'
+import { checkTask, findTask, taskRef, type TaskCheck } from './task-completion'
 
 // Basic RAG for this sprint: ONE model call per question, so it fits the free tier.
 // No 'use server' and no 'server-only' in this file: everything it needs is passed in
@@ -24,6 +26,7 @@ const UNCLEAR_MESSAGE =
 // Shown as buttons after two unclear messages in a row, so the next input is one we understand.
 const SUGGESTED_QUESTIONS = [
     'What onboarding tasks do I still need to complete?',
+    'Which of my tasks are most urgent?',
     'When do I need to complete mandatory training?',
     'How do I request leave?',
     'How do I set up my IT account?',
@@ -34,6 +37,10 @@ const RECORD_UNAVAILABLE_MESSAGE =
   "I can't see any onboarding tasks or details on your record yet, so I can't confirm that. I can ask the HR team to check that your onboarding has been set up."
 // These OFFER to pass the matter on; they never claim it was sent (BA rule). A case is
 // only saved when the employee presses the button, in requestEscalation().
+// Asking the assistant to change payroll, bank or other records (BA: not allowed; point to
+// the approved HR/payroll process instead).
+const RECORD_CHANGE_MESSAGE =
+    "I can't make that change for you. Changes like this go through the approved HR or payroll process. I can send your request to the HR team if you would like."
 const ESCALATION_MESSAGES: Record<Pathway, string> = {
     HR: 'This needs to be handled by a person rather than the AI Assistant. I can send it to the HR team if you would like.',
     IT: 'This needs to be handled by a person rather than the AI Assistant. Please contact IT Support directly. I can also log it with the HR team if you would like.',
@@ -46,8 +53,24 @@ function reply(kind: AssistantReply['kind'], text: string, extra: Partial<Assist
 
 // Every reply that hands the matter to a person carries an offer, which the chat window
 // shows as a "Send to HR team" button.
-function escalate(pathway: Pathway, category: CaseCategory): AssistantReply {
-    return reply('escalate', ESCALATION_MESSAGES[pathway], { pathway, escalationOffer: { category, pathway } })
+function escalate(pathway: Pathway, category: CaseCategory, draft?: string): AssistantReply {
+    const text = category === 'restricted-action' && pathway === 'HR' ? RECORD_CHANGE_MESSAGE : ESCALATION_MESSAGES[pathway]
+    return reply('escalate', text, { pathway, escalationOffer: { category, pathway, ...(draft ? { draft } : {}) } })
+}
+
+// The pages the assistant may link to. The model picks a NAME from decision.ts PAGES; the
+// address always comes from here, so a reply can never carry a link the app didn't choose.
+const PAGE_LINKS: Record<string, { label: string; href: string }> = {
+    checklist: { label: 'Open my checklist', href: '/dashboard' },
+}
+
+// "Mark a task completed": the wording is written by CODE, not the model, because only
+// code knows whether the task can really be completed. The model just names the task.
+const TASK_MESSAGES: Record<Exclude<TaskCheck, 'ok'>, (title: string) => string> = {
+    'not-found': () => "I couldn't find that task on your onboarding checklist, so nothing was changed.",
+    'already-completed': (title) => `"${title}" is already marked as completed on your checklist.`,
+    'not-allowed': (title) =>
+        `"${title}" is completed by the team that runs it (for example, IT activates your account at the setup session), so it can't be marked done from the Assistant. Contact HR if it looks wrong.`,
 }
 
 // Each policy section is listed once, even if several of its chunks were retrieved.
@@ -76,9 +99,11 @@ export async function answerQuestion(
         skipFaq?: boolean
         // The saved conversation so far (server-side copy). Missing for a new conversation.
         conversation?: ConversationContext & { topic?: string }
+        today?: string // YYYY-MM-DD; defaults to today in the company's time zone (set in tests)
     }
 ): Promise<AssistantReply> {
     const { uid, question, earlierQuestion, skipFaq, conversation } = input
+    const today = input.today ?? todayIn()
 
   // 1. Obvious sensitive matters → human, with zero model calls.
     const rule = matchSensitiveRule(question)
@@ -127,7 +152,7 @@ export async function answerQuestion(
       // Two attempts, not three: a failed call can take ~9s to come back, and the employee is watching a spinner.
         withRetry(() => deps.ai.models.generateContent({
         model: GEN_MODEL,
-        contents: buildPrompt({ question, earlierQuestion, policies, record: record ? formatRecord(record) : 'not available', conversation }),
+        contents: buildPrompt({ question, earlierQuestion, policies, record: record ? formatRecord(record, today) : 'not available', conversation, today }),
         config: {
             systemInstruction: SYSTEM_PROMPT,
             temperature: 0,
@@ -149,17 +174,31 @@ export async function answerQuestion(
         description: decision.description?.trim() || undefined,
         topic: decision.topic?.trim() || undefined,
     }
-    return { ...replyFor(decision, hits, earlierQuestion), memory }
+    return { ...replyFor(decision, hits, earlierQuestion, record), memory }
     } catch (error) {
         return errorReply(error)
     }
 }
 
 // What each model outcome means for the employee.
-function replyFor(decision: Decision, hits: RetrievedChunk[], earlierQuestion: string | undefined): AssistantReply {
+function replyFor(decision: Decision, hits: RetrievedChunk[], earlierQuestion: string | undefined, record: EmployeeRecord | null): AssistantReply {
     switch (decision.outcome) {
-        case 'answer':
-            return reply('answer', decision.text ?? '', { sources: toSources(hits) })
+        case 'answer': {
+            const link = decision.page ? PAGE_LINKS[decision.page] : undefined
+            const extra: Partial<AssistantReply> = { sources: toSources(hits), ...(link ? { links: [link] } : {}) }
+            const named = decision.complete_task?.trim()
+            if (!named) return reply('answer', decision.text ?? '', extra)
+            // The employee says a task is done. Code checks the task against THEIR record and
+            // either offers the confirm step or says why it can't.
+            const task = findTask(record?.checklist, named)
+            const check = checkTask(task)
+            const checklistLink = { links: [PAGE_LINKS.checklist!] }
+            if (check !== 'ok' || !task) return reply('answer', TASK_MESSAGES[check === 'ok' ? 'not-found' : check](task?.title ?? named), checklistLink)
+            return reply('answer', `I can mark "${task.title}" as completed on your onboarding checklist. Please check the details below and confirm.`, {
+                ...checklistLink,
+                taskOffer: { taskId: taskRef(task), taskTitle: task.title },
+            })
+        }
         case 'clarify':
             // Only ONE clarifying question per topic. Unclear again → stop asking and offer ready-made questions.
             return earlierQuestion
@@ -170,7 +209,7 @@ function replyFor(decision: Decision, hits: RetrievedChunk[], earlierQuestion: s
         case 'off_topic':
             return reply('fallback', OFF_TOPIC_MESSAGE)
         case 'escalate':
-            return escalate(decision.pathway ?? 'HR', decision.category ?? 'other')
+            return escalate(decision.pathway ?? 'HR', decision.category ?? 'other', decision.request_draft?.trim() || undefined)
         case 'not_found':
             return reply('fallback', NOT_FOUND_MESSAGE, { escalationOffer: { category: 'no-policy', pathway: 'HR' } })
     }
