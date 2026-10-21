@@ -71,7 +71,7 @@ All collections below are written and read on the server (Admin SDK) unless stat
 **Path:** `/employeeData/{uid}` (document ID = the employee's Firebase Auth UID)
 **Type:** `EmployeeOnboarding` in `frontend/src/lib/onboarding.ts`
 **Read by:** Home page checklist, chatbot (`features/chatbot/lib/record.ts`)
-**Written by:** seed script; the Admin "Add Employee" form (planned)
+**Written by:** seed script; the Admin "Add Employee" form (planned); `completeOwnTask` (`features/chatbot/lib/task-completion.ts`) when an employee confirms "Mark task completed" in the Assistant
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -85,9 +85,9 @@ All collections below are written and read on the server (Admin SDK) unless stat
 | `onboardingStatus` | `string` | `In Progress` or `Completed`, worked out from the checklist |
 | `itAccountStatus` | `string` | `Active` or `Pending` |
 | `mandatoryTrainingStatus` | `'completed' \| 'pending'` | |
-| `checklist` | `{ id, title, description, status, duein }[]` | `status` is `'completed' \| 'pending'` |
+| `checklist` | `{ id, title, description, status, duein, completedAt?, completedVia? }[]` | `status` is `'completed' \| 'pending'`. `completedAt` (ISO time) and `completedVia: 'assistant'` are added when the employee marks a task done in the Assistant |
 
-The chatbot reads the checklist only and ignores the three status fields, so it can't contradict the checklist.
+The chatbot reads the checklist only and ignores the three status fields, so it can't contradict the checklist. When it marks a task done it updates `onboardingStatus` (and `mandatoryTrainingStatus` for the `training` task) in the same write, so they stay in step. Tasks in `NOT_SELF_COMPLETABLE` (`it-account`) can't be marked done by the employee.
 
 ---
 
@@ -118,8 +118,8 @@ One document per section of an approved policy. Fields: `policyId`, `policyTitle
 | `createdAt` | `Timestamp` | Server time |
 | `employeeName`, `employeeId` | `string` | From `employeeData`; absent if there is no record |
 | `employeeUid` | `string` | Who sent it, from the sign-in session |
-| `category` | `string` | e.g. `complaint`, `pay`, `no-policy` |
-| `priority` | `1 \| 2 \| 3` | 1 = look at first |
+| `category` | `string` | e.g. `complaint`, `pay`, `system-access`, `onboarding-task`, `no-policy` |
+| `priority` | `1 \| 2 \| 3` | BA levels: 1 = High (sensitive HR concerns; system access problems on or before the start date), 2 = Medium (onboarding documents or training, other access problems, approval requests), 3 = Low (general questions). High cases don't count towards the daily limit of 3 |
 | `_schemaVersion` | `1` | |
 
 ---
@@ -148,7 +148,7 @@ One document per section of an approved policy. Fields: `policyId`, `policyTitle
 
 ## `faqAnswers` collection
 
-**Path:** `/faqAnswers/{autoId}`
+**Path:** `/faqAnswers/{autoId}`; the BA's five starter answers use the fixed ids `ba-starter-1` to `ba-starter-5`
 **Written by:** Admin Stored Answers page (`actions/faq.actions.ts`); seed script (starter answers, switched off)
 **Read by:** chatbot (`matchFaq` in `lib/rag/faq.ts`), before the AI is called
 

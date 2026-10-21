@@ -94,32 +94,37 @@ async function ensureDemoUser(app: App, email: string, displayName: string): Pro
 
 // A policy file must have exactly ONE top-level heading: that heading is the title
 // employees see as the source. Stops a stray "# note" line silently becoming the title.
-// Drafts written from the seed policies. Each answer only repeats what its policy says.
+// The BA's five starter stored answers (Sprint 3 automation rules, "pending approval").
+// Fixed ids, so re-seeding adds any that are missing but never overwrites HR's edits.
+// Added switched OFF: HR approves each one on the Admin Stored Answers page first.
+// Note: 1 and 2 are returned word for word BEFORE the AI, so while they are switched on,
+// those questions get this general answer; "Get a more detailed answer" gives the
+// employee's own task list.
 const STARTER_FAQS = [
     {
-        question: 'How do I request leave?',
-        answer: 'Submit your leave request in the Employee Portal under My Leave. For planned annual leave, submit it at least two weeks before the first day of leave. Your manager reviews it, usually within three business days.',
-        policyTitle: 'Leave Policy',
+        id: 'ba-starter-1',
+        question: 'What onboarding tasks do I still need to complete?',
+        answer: 'You can view your outstanding tasks on the Home page under Checklist. Tasks marked Pending still need attention.',
     },
     {
-        question: 'What should I do if I am running late?',
-        answer: 'Message your manager before 9:30 am to let them know you are running late.',
-        policyTitle: 'Workplace & Attendance Policy',
+        id: 'ba-starter-2',
+        question: 'How do I check my onboarding progress?',
+        answer: 'Your Home page shows your onboarding progress, including the number of completed tasks and the remaining tasks.',
     },
     {
-        question: 'What should I do if I am sick and cannot come to work?',
-        answer: 'Notify your manager before your usual start time, by phone or team chat, and then submit personal leave in the Employee Portal.',
-        policyTitle: 'Workplace & Attendance Policy',
+        id: 'ba-starter-3',
+        question: 'Where can I find company policies?',
+        answer: 'You can ask the AI Assistant about approved onboarding policies. If the information is unavailable, contact HR for clarification.',
     },
     {
-        question: 'When do I need to complete mandatory training?',
-        answer: 'Mandatory training is three online modules in the Learning Hub. The Workplace Health and Safety (WHS) Induction must be completed before your first day. The other two, Privacy and Information Security and Respect at Work, are due within 30 days of your start date.',
-        policyTitle: 'New Employee Onboarding Guide',
+        id: 'ba-starter-4',
+        question: 'What should I do if I cannot access a required system?',
+        answer: 'Contact your IT support team or follow the approved IT access request process. If you are unsure who to contact, ask HR for guidance.',
     },
     {
-        question: 'How do I set up my IT account?',
-        answer: 'Your IT account is activated at the IT setup session at 10:00 am on your first day. For help, contact the IT Service Desk at itsupport@northbridge.example or 03 9000 1300.',
-        policyTitle: 'IT & System Access Guide',
+        id: 'ba-starter-5',
+        question: 'What if I have a sensitive HR question?',
+        answer: 'For confidential or sensitive matters, such as salary discussions, complex leave requests or personal workplace concerns, please contact HR directly.',
     },
 ]
 
@@ -155,12 +160,15 @@ async function main() {
         console.info(`${file}: ${result.chunkCount} chunks`)
     }
 
-    // Starter stored answers, ONLY when there are none yet, so HR's own edits are never
-    // overwritten. Added switched OFF: HR reads and approves each one on the Admin page first.
-    if ((await deps.db.collection(FAQ_COLLECTION).limit(1).get()).empty) {
-        for (const faq of STARTER_FAQS) await saveFaq(deps, { ...faq, active: false, savedBy: 'seed-script' })
-        console.info(`Added ${STARTER_FAQS.length} starter stored answers (switched off until HR approves them)`)
+    // The BA's starter stored answers: each one is added only if its id isn't there yet, so
+    // HR's own edits are never overwritten. Added switched OFF until HR approves them.
+    let added = 0
+    for (const faq of STARTER_FAQS) {
+        if ((await deps.db.collection(FAQ_COLLECTION).doc(faq.id).get()).exists) continue
+        await saveFaq(deps, { ...faq, active: false, savedBy: 'seed-script' })
+        added++
     }
+    console.info(`Starter stored answers: ${added} added, ${STARTER_FAQS.length - added} already there (switched off until HR approves them)`)
 
     // 3. One login + one onboarding record per demo employee. Document ID = Auth uid.
     for (const { email, record } of DEMO_EMPLOYEES) {

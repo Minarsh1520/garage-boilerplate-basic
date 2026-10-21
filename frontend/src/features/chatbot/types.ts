@@ -8,7 +8,18 @@ export type AssistantMessageKind = (typeof ASSISTANT_KINDS)[number]
 // the rules file) because the reply, the rules and the model decision all share them.
 export const PATHWAYS = ['HR', 'IT', 'Manager'] as const
 export type Pathway = (typeof PATHWAYS)[number]
-export const ESCALATION_CATEGORIES = ['pay', 'complaint', 'employment-decision', 'restricted-action', 'wellbeing', 'other'] as const
+// system-access and onboarding-task were added for the BA's support requests (Sprint 3):
+// a login or system access problem, and an outstanding onboarding document or training issue.
+export const ESCALATION_CATEGORIES = [
+  'pay',
+  'complaint',
+  'employment-decision',
+  'restricted-action',
+  'wellbeing',
+  'system-access',
+  'onboarding-task',
+  'other',
+] as const
 export type EscalationCategory = (typeof ESCALATION_CATEGORIES)[number]
 
 // A user turn and an assistant turn get different length limits on purpose:
@@ -33,9 +44,11 @@ export const chatTurnSchema = z.discriminatedUnion('role', [
 export const CASE_CATEGORIES = [...ESCALATION_CATEGORIES, 'no-policy'] as const
 export type CaseCategory = (typeof CASE_CATEGORIES)[number]
 
-// What the chat window sends back when the employee presses "Send to HR team".
+// What the chat window sends back when the employee confirms the request preview.
+// `question` is the description the HR team will see: the AI's draft or the employee's
+// own question, as the employee left it after editing.
 export const requestEscalationSchema = z.object({
-  question: z.string().min(1).max(MAX_QUESTION_LENGTH),
+  question: z.string().trim().min(1).max(MAX_QUESTION_LENGTH),
   category: z.enum(CASE_CATEGORIES),
   pathway: z.enum(PATHWAYS),
 })
@@ -50,6 +63,12 @@ export const sendChatInputSchema = z.object({
   skipFaq: z.boolean().optional(),
 })
 
+// What the chat window sends when the employee confirms "Mark task completed".
+// Only the task's id: WHOSE checklist comes from the session, never from the browser.
+export const completeTaskSchema = z.object({
+  taskId: z.string().trim().min(1).max(200),
+})
+
 export type ChatTurn = z.infer<typeof chatTurnSchema>
 
 export interface AssistantReply {
@@ -62,7 +81,15 @@ export interface AssistantReply {
   suggestions?: string[]           // ready-made questions shown as buttons
   // Present when the employee may send this question to the HR team. Nothing is saved
   // until they press the button: the offer alone creates no case.
-  escalationOffer?: { category: CaseCategory; pathway: Pathway }
+  // `draft` is the AI's short description of the request, shown in the preview for the
+  // employee to check and edit. Missing when no AI call was made (a sensitive-rule match).
+  escalationOffer?: { category: CaseCategory; pathway: Pathway; draft?: string }
+  // Present when the employee may mark one of their own pending tasks as completed.
+  // Code has already checked the task is theirs, pending and one they may complete;
+  // nothing changes until they press Confirm, and the server checks again then.
+  taskOffer?: { taskId: string; taskTitle: string }
+  // Links to app pages, chosen by code from a fixed list (never a URL the AI wrote).
+  links?: { label: string; href: string }[]
   // True when the text is a stored answer from the Admin FAQ page, not written by the AI.
   // The chat window then offers "Get a more detailed answer".
   fromFaq?: boolean

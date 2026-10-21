@@ -16,4 +16,5 @@ export function sortCasesForReview<T extends SortableCase>(cases: T[]): T[] {
   )
 }
 
-export const PRIORITY_LABELS: Record<number, string> = { 1: 'Urgent', 2: 'High', 3: 'Normal' }
+// The BA's names for the three levels (Sprint 3 automation rules).
+export const PRIORITY_LABELS: Record<number, string> = { 1: 'High', 2: 'Medium', 3: 'Low' }
