@@ -20,7 +20,17 @@ const recordSchema = z.object({
     manager: z.string().optional(),
     startDate: z.string().optional(),
     checklist: z
-        .array(z.object({ id: z.string().optional(), title: z.string(), status: z.enum(['completed', 'pending']), duein: z.string().optional() }))
+        // dueDate (YYYY-MM-DD) is written by the Admin task tools (task.actions.ts, employee.actions.ts)
+        // next to their "3 Days" wording; seeded tasks only have the wording.
+        .array(
+            z.object({
+                id: z.string().optional(),
+                title: z.string(),
+                status: z.enum(['completed', 'pending']),
+                duein: z.string().optional(),
+                dueDate: z.string().optional(),
+            })
+        )
         .optional(),
 })
 export type EmployeeRecord = z.infer<typeof recordSchema>

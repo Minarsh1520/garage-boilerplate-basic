@@ -45,7 +45,11 @@ export function resolveDueDate(duein: string | undefined, startDate: string | un
     if (!startDate || !ISO_DATE.test(startDate)) return null // relative deadlines need the start date
     if (/\bbefore (your|the) first day\b/i.test(text)) return addDays(startDate, -1)
     if (/\b(on )?(your|the) first day\b/i.test(text)) return startDate
-    const days = text.match(/\b(\d{1,3})\s+days?\s+(from|after)\s+(your\s+|the\s+)?start/i) ?? text.match(/\bwithin\s+(\d{1,3})\s+days?\b/i)
+    // "3 Days" is how the Admin task tools word it: days from the start date.
+    const days =
+        text.match(/^(\d{1,3})\s+days?$/i) ??
+        text.match(/\b(\d{1,3})\s+days?\s+(from|after)\s+(your\s+|the\s+)?start/i) ??
+        text.match(/\bwithin\s+(\d{1,3})\s+days?\b/i)
     if (days?.[1]) return addDays(startDate, Number(days[1]))
     return null
 }
@@ -66,15 +70,18 @@ export interface DatedTask<T> {
     daysLeft: number | null // negative = overdue
 }
 
+// Each task's date: its saved dueDate if it has a valid one, otherwise worked out from duein.
 // Pending tasks first, soonest due first (overdue at the top); tasks with no known date
 // after them; completed tasks last. The original order is kept within each group.
-export function sortTasksByUrgency<T extends { status: string; duein?: string }>(
+export function sortTasksByUrgency<T extends { status: string; duein?: string; dueDate?: string }>(
     tasks: T[],
     startDate: string | undefined,
     today: string
 ): DatedTask<T>[] {
     const dated = tasks.map((task, index) => {
-        const dueDate = resolveDueDate(task.duein, startDate)
+        // A real date saved with the task (Admin task tools) wins over working it out from the words.
+        const stored = task.dueDate && ISO_DATE.test(task.dueDate) ? task.dueDate : null
+        const dueDate = stored ?? resolveDueDate(task.duein, startDate)
         return { task, dueDate, daysLeft: dueDate ? daysBetween(today, dueDate) : null, index }
     })
     const group = (t: (typeof dated)[number]) => (t.task.status === 'completed' ? 2 : t.daysLeft === null ? 1 : 0)

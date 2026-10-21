@@ -12,6 +12,8 @@ describe('resolveDueDate', () => {
         ['28 days from your start date', '2026-10-12'],
         ['Within 30 days', '2026-10-14'],
         ['2026-11-01', '2026-11-01'],
+        ['3 Days', '2026-09-17'],
+        ['0 Days', '2026-09-14'],
     ])('turns "%s" into %s', (duein, expected) => {
         expect(resolveDueDate(duein, START)).toBe(expected)
     })
@@ -66,5 +68,24 @@ describe('sortTasksByUrgency', () => {
         expect(text.indexOf('Company Policies')).toBeLessThan(text.indexOf('Super Fund Nomination'))
         // Completed tasks keep their wording but get no "overdue" label.
         expect(text).toContain('- TFN Declaration: completed (due: Before your first day)')
+    })
+})
+
+describe('tasks from the Admin task tools (dueDate saved with the task)', () => {
+    it('uses the saved dueDate over the wording, and ignores one that is not a date', () => {
+        const tasks: { title: string; status: 'pending' | 'completed'; duein: string; dueDate?: string }[] = [
+            { title: 'Read through company policies', status: 'pending', duein: '1 Days', dueDate: '2026-10-20' },
+            { title: 'Super Fund Nomination', status: 'pending', duein: '3 Days', dueDate: 'soon' },
+        ]
+        const sorted = sortTasksByUrgency(tasks, START, '2026-10-17')
+        expect(sorted.map((t) => [t.task.title, t.dueDate])).toEqual([
+            ['Super Fund Nomination', '2026-09-17'], // bad dueDate: worked out from "3 Days"
+            ['Read through company policies', '2026-10-20'], // saved date used as is
+        ])
+    })
+
+    it('keeps dueDate when reading the record, so the AI sees the real date', () => {
+        const text = formatRecord({ startDate: START, checklist: [{ title: 'Tax File Declaration', status: 'pending', duein: '0 Days', dueDate: '2026-10-18' }] }, '2026-10-17')
+        expect(text).toContain('- Tax File Declaration: pending (due: 0 Days, 2026-10-18, due tomorrow)')
     })
 })
