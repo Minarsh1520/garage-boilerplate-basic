@@ -693,6 +693,7 @@ export function ChatWindow() {
           {isPending ? (
             <button
               type="button"
+              data-tour="stop-query"
               onClick={stop}
               aria-label="Stop waiting for the answer"
               title="Stop"
