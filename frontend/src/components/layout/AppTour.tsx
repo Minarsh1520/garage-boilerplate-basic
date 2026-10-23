@@ -51,7 +51,6 @@ export function AppTour() {
     const conversationHistory = document.querySelector<HTMLElement>('[data-tour="conversation-history"]')
     const newChat = document.querySelector<HTMLElement>('[data-tour="new-chat"]')
     const chatInput = document.querySelector<HTMLElement>('[data-tour="chat-input"]')
-    const stopQuery = document.querySelector<HTMLElement>('[data-tour="stop-query"]')
     const assistantResponse = document.querySelector<HTMLElement>('[data-tour="assistant-response"]')
 
     if (checklist) { checklist.style.zIndex = step === 2 ? '60' : ''; checklist.style.backgroundColor = step === 2 ? 'white' : '' }
@@ -59,6 +58,7 @@ export function AppTour() {
     if (taskStatus) { taskStatus.style.zIndex = step === 4 ? '60' : ''; taskStatus.style.backgroundColor = step === 4 ? 'white' : '' }
     if (assistantLink) { assistantLink.style.zIndex = step === 5 ? '60' : ''; assistantLink.style.backgroundColor = step === 5 ? 'white' : '' }
     if (assistantNav) { assistantNav.style.zIndex = step === 5 ? '60' : ''; assistantNav.style.backgroundColor = step === 5 ? 'white' : '' }
+
     if (conversationHistory) {
       conversationHistory.style.zIndex = step === 8 ? '60' : ''
       conversationHistory.style.backgroundColor = step === 8 ? 'white' : ''
@@ -68,9 +68,9 @@ export function AppTour() {
       newChat.style.zIndex = step === 9 ? '60' : ''
       newChat.style.backgroundColor = step === 9 ? 'white' : ''
     }
-    if (chatInput) chatInput.style.zIndex = step === 13 || step === 14 ? '60' : ''
-    if (stopQuery) stopQuery.style.zIndex = step === 14 ? '70' : ''
-    if (assistantResponse) assistantResponse.style.zIndex = step === 15 ? '60' : ''
+
+    if (chatInput) chatInput.style.zIndex = step === 13 ? '60' : ''
+    if (assistantResponse) assistantResponse.style.zIndex = step === 14 ? '60' : ''
 
     return () => {
       if (checklist) { checklist.style.zIndex = ''; checklist.style.backgroundColor = '' }
@@ -78,6 +78,7 @@ export function AppTour() {
       if (taskStatus) { taskStatus.style.zIndex = ''; taskStatus.style.backgroundColor = '' }
       if (assistantLink) { assistantLink.style.zIndex = ''; assistantLink.style.backgroundColor = '' }
       if (assistantNav) { assistantNav.style.zIndex = ''; assistantNav.style.backgroundColor = '' }
+
       if (conversationHistory) {
         conversationHistory.style.zIndex = ''
         conversationHistory.style.backgroundColor = ''
@@ -87,26 +88,19 @@ export function AppTour() {
         newChat.style.zIndex = ''
         newChat.style.backgroundColor = ''
       }
+
       if (chatInput) chatInput.style.zIndex = ''
-      if (stopQuery) stopQuery.style.zIndex = ''
       if (assistantResponse) assistantResponse.style.zIndex = ''
     }
   }, [step])
 
   useEffect(() => {
-    const handleQueryStarted = () => { if (step === 13) setStep(14) }
-    const handleQueryStopped = () => { if (step === 14) setStep(15) }
-    const handleResponseReady = () => { if (step === 13 || step === 14) setStep(15) }
-
-    window.addEventListener('tour-query-started', handleQueryStarted)
-    window.addEventListener('tour-query-stopped', handleQueryStopped)
-    window.addEventListener('tour-response-ready', handleResponseReady)
-
-    return () => {
-      window.removeEventListener('tour-query-started', handleQueryStarted)
-      window.removeEventListener('tour-query-stopped', handleQueryStopped)
-      window.removeEventListener('tour-response-ready', handleResponseReady)
+    const handleResponseReady = () => {
+      if (step === 13) setStep(14)
     }
+
+    window.addEventListener('tour-response-ready', handleResponseReady)
+    return () => window.removeEventListener('tour-response-ready', handleResponseReady)
   }, [step])
 
   if (step === 0) return null
@@ -124,9 +118,10 @@ export function AppTour() {
 
   const tourBox = 'fixed right-8 top-16 z-[70] w-[290px] rounded-xl border-2 border-[#4361AB] bg-white p-5 shadow-xl'
   const assistantTourBox = 'fixed left-8 top-44 z-[70] w-[290px] rounded-xl border-2 border-[#4361AB] bg-white p-5 shadow-xl'
+
   return (
     <>
-      {step !== 13 && step !== 14 && <div className="fixed inset-0 z-50 bg-black/35" />}
+      {step !== 13 && <div className="fixed inset-0 z-50 bg-black/35" />}
 
       {step === 1 && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center">
@@ -172,7 +167,6 @@ export function AppTour() {
 
           <div className="mt-5 flex items-center justify-between">
             <button type="button" onClick={() => void completeTour()} className="rounded px-2 py-1 text-xs text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]">SKIP TOUR</button>
-
             <div className="flex gap-1">
               <button type="button" onClick={() => setStep(2)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronLeft className="h-5 w-5" /></button>
               <button type="button" onClick={() => setStep(4)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronRight className="h-5 w-5" /></button>
@@ -193,7 +187,6 @@ export function AppTour() {
 
           <div className="mt-5 flex items-center justify-between">
             <button type="button" onClick={() => void completeTour()} className="rounded px-2 py-1 text-xs text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]">SKIP TOUR</button>
-
             <div className="flex gap-1">
               <button type="button" onClick={() => setStep(3)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronLeft className="h-5 w-5" /></button>
               <button type="button" onClick={() => setStep(5)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronRight className="h-5 w-5" /></button>
@@ -240,7 +233,6 @@ export function AppTour() {
 
           <div className="mt-5 flex items-center justify-between">
             <button type="button" onClick={() => void completeTour()} className="rounded px-2 py-1 text-xs text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]">SKIP TOUR</button>
-
             <div className="flex gap-1">
               <button type="button" onClick={() => setStep(5)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronLeft className="h-5 w-5" /></button>
               <button type="button" onClick={() => { setStep(7); router.push('/chatbot') }} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronRight className="h-5 w-5" /></button>
@@ -266,7 +258,6 @@ export function AppTour() {
               {tourMode !== 'chatbot' && (
                 <button type="button" onClick={() => { setStep(6); router.push('/dashboard') }} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronLeft className="h-5 w-5" /></button>
               )}
-
               <button type="button" onClick={() => setStep(8)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronRight className="h-5 w-5" /></button>
             </div>
           </div>
@@ -279,13 +270,12 @@ export function AppTour() {
             <BotMessageSquare className="h-10 w-10 shrink-0 text-[#4361AB]" />
             <div>
               <h3 className="text-base font-bold text-[#222222]">Chat History</h3>
-              <p className="mt-1 text-sm text-[#222222]">Use the conversation menu to open your previous chats and continue where you left off.</p>
+              <p className="mt-1 text-sm text-[#222222]">Use the conversation menu to open and continue your previous chats.</p>
             </div>
           </div>
 
           <div className="mt-5 flex items-center justify-between">
             <button type="button" onClick={() => void completeTour()} className="rounded px-2 py-1 text-xs text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]">SKIP TOUR</button>
-
             <div className="flex gap-1">
               <button type="button" onClick={() => setStep(7)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronLeft className="h-5 w-5" /></button>
               <button type="button" onClick={() => setStep(9)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronRight className="h-5 w-5" /></button>
@@ -300,13 +290,12 @@ export function AppTour() {
             <BotMessageSquare className="h-10 w-10 shrink-0 text-[#4361AB]" />
             <div>
               <h3 className="text-base font-bold text-[#222222]">New Chat</h3>
-              <p className="mt-1 text-sm text-[#222222]">Use New chat when you want to start a fresh conversation with the Assistant.</p>
+              <p className="mt-1 text-sm text-[#222222]">Select New chat when you want to start a new conversation.</p>
             </div>
           </div>
 
           <div className="mt-5 flex items-center justify-between">
             <button type="button" onClick={() => void completeTour()} className="rounded px-2 py-1 text-xs text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]">SKIP TOUR</button>
-
             <div className="flex gap-1">
               <button type="button" onClick={() => setStep(8)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronLeft className="h-5 w-5" /></button>
               <button type="button" onClick={() => setStep(10)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronRight className="h-5 w-5" /></button>
@@ -322,7 +311,6 @@ export function AppTour() {
             <div>
               <h3 className="text-base font-bold text-[#222222]">What Can It Do?</h3>
               <p className="mt-1 text-sm text-[#222222]">You can use it to:</p>
-
               <ul className="mt-2 list-disc pl-4 text-sm text-[#222222]">
                 <li>Understand onboarding tasks</li>
                 <li>Find onboarding information</li>
@@ -333,7 +321,6 @@ export function AppTour() {
 
           <div className="mt-5 flex items-center justify-between">
             <button type="button" onClick={() => void completeTour()} className="rounded px-2 py-1 text-xs text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]">SKIP TOUR</button>
-
             <div className="flex gap-1">
               <button type="button" onClick={() => setStep(9)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronLeft className="h-5 w-5" /></button>
               <button type="button" onClick={() => setStep(11)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronRight className="h-5 w-5" /></button>
@@ -355,7 +342,6 @@ export function AppTour() {
 
           <div className="mt-5 flex items-center justify-between">
             <button type="button" onClick={() => void completeTour()} className="rounded px-2 py-1 text-xs text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]">SKIP TOUR</button>
-
             <div className="flex gap-1">
               <button type="button" onClick={() => setStep(10)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronLeft className="h-5 w-5" /></button>
               <button type="button" onClick={() => setStep(12)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronRight className="h-5 w-5" /></button>
@@ -376,7 +362,6 @@ export function AppTour() {
 
           <div className="mt-5 flex items-center justify-between">
             <button type="button" onClick={() => void completeTour()} className="rounded px-2 py-1 text-xs text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]">SKIP TOUR</button>
-
             <div className="flex gap-1">
               <button type="button" onClick={() => setStep(11)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronLeft className="h-5 w-5" /></button>
               <button type="button" onClick={() => setStep(13)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronRight className="h-5 w-5" /></button>
@@ -391,7 +376,7 @@ export function AppTour() {
             <BotMessageSquare className="h-10 w-10 shrink-0 text-[#4361AB]" />
             <div>
               <h3 className="text-base font-bold text-[#222222]">Ask a Question</h3>
-              <p className="mt-1 text-sm text-[#222222]">Type an onboarding question into the Assistant below and send it.</p>
+              <p className="mt-1 text-sm text-[#222222]">Type an onboarding question below. While the Assistant is answering, you can use Stop to stop waiting.</p>
             </div>
           </div>
 
@@ -407,23 +392,6 @@ export function AppTour() {
           <div className="flex gap-3">
             <BotMessageSquare className="h-10 w-10 shrink-0 text-[#4361AB]" />
             <div>
-              <h3 className="text-base font-bold text-[#222222]">Stop a Query</h3>
-              <p className="mt-1 text-sm text-[#222222]">While the Assistant is thinking, the Send button becomes a Stop button. Click it if you do not want to keep waiting.</p>
-            </div>
-          </div>
-
-          <div className="mt-5 flex items-center justify-between">
-            <button type="button" onClick={() => void completeTour()} className="rounded px-2 py-1 text-xs text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]">SKIP TOUR</button>
-            <span className="text-xs font-semibold text-[#4361AB]">Waiting for response...</span>
-          </div>
-        </div>
-      )}
-
-      {step === 15 && (
-        <div className={assistantTourBox}>
-          <div className="flex gap-3">
-            <BotMessageSquare className="h-10 w-10 shrink-0 text-[#4361AB]" />
-            <div>
               <h3 className="text-base font-bold text-[#222222]">Assistant Response</h3>
               <p className="mt-1 text-sm text-[#222222]">Here is the Assistant&apos;s response to your question.</p>
             </div>
@@ -431,16 +399,15 @@ export function AppTour() {
 
           <div className="mt-5 flex items-center justify-between">
             <button type="button" onClick={() => void completeTour()} className="rounded px-2 py-1 text-xs text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]">SKIP TOUR</button>
-
             <div className="flex gap-1">
               <button type="button" onClick={() => setStep(13)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronLeft className="h-5 w-5" /></button>
-              <button type="button" onClick={() => setStep(16)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronRight className="h-5 w-5" /></button>
+              <button type="button" onClick={() => setStep(15)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronRight className="h-5 w-5" /></button>
             </div>
           </div>
         </div>
       )}
 
-      {step === 16 && (
+      {step === 15 && (
         <div className={assistantTourBox}>
           <div className="flex gap-3">
             <BotMessageSquare className="h-10 w-10 shrink-0 text-[#4361AB]" />
@@ -452,16 +419,15 @@ export function AppTour() {
 
           <div className="mt-5 flex items-center justify-between">
             <button type="button" onClick={() => void completeTour()} className="rounded px-2 py-1 text-xs text-zinc-500 hover:bg-[#EEF3FA] hover:text-[#4361AB]">SKIP TOUR</button>
-
             <div className="flex gap-1">
-              <button type="button" onClick={() => setStep(15)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronLeft className="h-5 w-5" /></button>
-              <button type="button" onClick={() => setStep(17)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronRight className="h-5 w-5" /></button>
+              <button type="button" onClick={() => setStep(14)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronLeft className="h-5 w-5" /></button>
+              <button type="button" onClick={() => setStep(16)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronRight className="h-5 w-5" /></button>
             </div>
           </div>
         </div>
       )}
 
-      {step === 17 && (
+      {step === 16 && (
         <div className={assistantTourBox}>
           <div className="flex gap-3">
             <BotMessageSquare className="h-10 w-10 shrink-0 text-[#4361AB]" />
@@ -473,14 +439,14 @@ export function AppTour() {
 
           <div className="mt-5 flex justify-end">
             <div className="flex gap-1">
-              <button type="button" onClick={() => setStep(16)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronLeft className="h-5 w-5" /></button>
-              <button type="button" onClick={() => setStep(18)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronRight className="h-5 w-5" /></button>
+              <button type="button" onClick={() => setStep(15)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronLeft className="h-5 w-5" /></button>
+              <button type="button" onClick={() => setStep(17)} className="rounded p-1 text-[#4361AB] hover:bg-[#EEF3FA]"><ChevronRight className="h-5 w-5" /></button>
             </div>
           </div>
         </div>
       )}
 
-      {step === 18 && (
+      {step === 17 && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center">
           <div className="w-[340px] rounded-xl border-2 border-[#4361AB] bg-white px-7 py-6 text-center shadow-xl">
             <CircleCheckBig className="mx-auto h-14 w-14 text-[#4361AB]" />
