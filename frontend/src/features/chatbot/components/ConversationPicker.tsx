@@ -49,6 +49,7 @@ export function ConversationPicker(props: {
     <div ref={panelRef} className="relative flex items-center gap-2 border-b border-[#4361AB] px-3 py-2 sm:px-6">
       <button
         type="button"
+        data-tour="conversation-history"
         onClick={() => setOpen((v) => !v)}
         disabled={props.disabled}
         aria-expanded={open}
@@ -70,6 +71,7 @@ export function ConversationPicker(props: {
       )}
       <button
         type="button"
+        data-tour="new-chat"
         onClick={() => {
           setOpen(false)
           props.onNew()
