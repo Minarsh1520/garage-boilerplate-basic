@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { createNote } from '@/features/notes/actions/notes.actions'
+import { ui } from '@/lib/theme'
 
 const createNoteFormSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200),
@@ -34,9 +35,9 @@ export function CreateNoteForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 rounded-lg border p-4">
+    <form onSubmit={handleSubmit(onSubmit)} className={`space-y-3 ${ui.card}`}>
       <div className="space-y-1.5">
-        <label htmlFor="title" className="text-sm font-medium">
+        <label htmlFor="title" className={ui.label}>
           Title
         </label>
         <input
@@ -44,25 +45,25 @@ export function CreateNoteForm() {
           type="text"
           aria-invalid={!!errors.title}
           aria-describedby={errors.title ? 'title-error' : undefined}
-          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-zinc-400 focus:ring-2 focus:ring-zinc-500 focus:outline-none aria-invalid:border-red-500 dark:border-zinc-700 dark:bg-zinc-900"
+          className={ui.input}
           placeholder="Note title"
           {...register('title')}
         />
         {errors.title && (
-          <p id="title-error" className="text-xs text-red-500" role="alert">
+          <p id="title-error" className={ui.fieldError} role="alert">
             {errors.title.message}
           </p>
         )}
       </div>
 
       <div className="space-y-1.5">
-        <label htmlFor="body" className="text-sm font-medium">
+        <label htmlFor="body" className={ui.label}>
           Body
         </label>
         <textarea
           id="body"
           rows={3}
-          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-zinc-400 focus:ring-2 focus:ring-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+          className={ui.input}
           placeholder="Write something..."
           {...register('body')}
         />
@@ -71,7 +72,7 @@ export function CreateNoteForm() {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+        className={ui.buttonPrimary}
       >
         {isSubmitting ? 'Saving…' : 'Add note'}
       </button>

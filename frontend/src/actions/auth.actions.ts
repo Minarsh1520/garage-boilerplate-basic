@@ -1,6 +1,6 @@
 'use server'
 
-import { adminAuth } from '@/lib/firebase/admin'
+import { adminAuth, adminDb } from '@/lib/firebase/admin'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import type { ActionResult } from '@/types'
@@ -37,6 +37,17 @@ export async function requireAuth() {
   return session
 }
 
+export async function requireAdmin(){
+  const session = await requireAuth()
+  const userSnap = await adminDb. collection('users') .doc(session.uid) .get()
+
+  if(!userSnap.exists || userSnap.data()?.role != 'admin'){
+    redirect('/dashboard')
+  }
+
+  return session
+}
+
 /**
  * Server-side sign out: clears the session cookie.
  */
@@ -47,5 +58,26 @@ export async function serverSignOut(): Promise<ActionResult> {
     return { success: true }
   } catch {
     return { success: false, error: 'Failed to sign out' }
+  }
+}
+
+export async function completeAppTour(): Promise<ActionResult> {
+  try {
+    const session = await requireAuth()
+
+    await adminDb
+      .collection('users')
+      .doc(session.uid)
+      .set(
+        {
+          tourCompleted: true,
+          updatedAt: new Date(),
+        },
+        { merge: true }
+      )
+
+    return { success: true }
+  } catch {
+    return { success: false, error: 'Failed to complete app tour' }
   }
 }

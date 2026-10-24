@@ -23,6 +23,7 @@
     "firebase": "^11.6.0",
     "firebase-admin": "^13.3.0",
     "lucide-react": "^0.501.0",
+    "mammoth": "^1.13.0",
     "next": "16.3.5",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -30,6 +31,7 @@
     "server-only": "^0.0.1",
     "sonner": "^2.0.3",
     "tailwind-merge": "^3.2.0",
+    "unpdf": "^1.8.1",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -48,6 +50,7 @@
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^3.1.1"
   }
