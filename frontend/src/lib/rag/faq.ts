@@ -14,7 +14,8 @@ export const faqInputSchema = z.object({
     question: z.string().trim().min(5, 'Please write the question.').max(300),
     answer: z.string().trim().min(1, 'Please write the answer.').max(2000),
     // Optional: shown as the source under the answer, like a policy answer.
-    policyTitle: z.string().trim().max(120).optional().transform((v) => v || undefined),
+    // Zod 4: .optional() goes last so the key stays optional after the transform.
+    policyTitle: z.string().trim().max(120).transform((v) => v || undefined).optional(),
 })
 export type FaqInput = z.infer<typeof faqInputSchema>
 

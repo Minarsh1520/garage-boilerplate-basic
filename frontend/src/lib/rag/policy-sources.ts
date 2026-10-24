@@ -16,7 +16,8 @@ export const policyFormSchema = z.object({
         .max(120)
         // Any language counts ("Chính sách nghỉ phép", "請假政策"); only symbols and emoji don't.
         .refine((t) => /[\p{L}\p{N}]/u.test(t), 'The title needs at least one letter or number.'),
-    intro: z.string().trim().max(4000).optional().transform((v) => v || undefined),
+    // Zod 4: .optional() goes last so the key stays optional after the transform.
+    intro: z.string().trim().max(4000).transform((v) => v || undefined).optional(),
     sections: z.array(policySectionSchema).min(1, 'Add at least one section.').max(50),
 })
 export type PolicyForm = z.infer<typeof policyFormSchema>
