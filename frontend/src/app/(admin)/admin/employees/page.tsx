@@ -35,7 +35,6 @@ export default function EmployeesPage() {
   const [template, setTemplate] = useState('personal-details')
   const [taskDueDays, setTaskDueDays] = useState('1')
   const [employeeTasks, setEmployeeTasks] = useState<EmployeeTask[]>([])
-  const [loadingTasks, setLoadingTasks] = useState(false)
   const [assigning, setAssigning] = useState(false)
   const [removingTaskId, setRemovingTaskId] = useState('')
   const [taskSuccess, setTaskSuccess] = useState('')
@@ -62,14 +61,26 @@ export default function EmployeesPage() {
       .catch(() => setTaskError('Failed to load employee data.'))
   }, [])
 
+  // Whose tasks are currently loaded. "Loading" is worked out during render
+  // (selected email differs from loaded email) instead of being set inside the
+  // effect, which the react-hooks/set-state-in-effect lint rule forbids.
+  const [tasksFor, setTasksFor] = useState('')
+  const loadingTasks = taskEmail !== '' && tasksFor !== taskEmail
+
   useEffect(() => {
-    if (!taskEmail) { setEmployeeTasks([]); return }
-    const loadTasks = async () => {
-      setLoadingTasks(true)
-      try { setEmployeeTasks(await getEmployeeTasks(taskEmail)) } catch { setEmployeeTasks([]) }
-      setLoadingTasks(false)
-    }
-    loadTasks()
+    // No employee selected: nothing to load. The task list is hidden anyway
+    // ({taskEmail && ...} in the JSX), so there is no need to clear it.
+    if (!taskEmail) return
+    let cancelled = false
+    getEmployeeTasks(taskEmail)
+      .catch(() => [] as EmployeeTask[])
+      .then((tasks) => {
+        // Ignore a late reply if the admin picked another employee meanwhile.
+        if (cancelled) return
+        setEmployeeTasks(tasks)
+        setTasksFor(taskEmail)
+      })
+    return () => { cancelled = true }
   }, [taskEmail])
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
