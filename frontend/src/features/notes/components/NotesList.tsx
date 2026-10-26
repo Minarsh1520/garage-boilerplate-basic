@@ -6,7 +6,6 @@ import { useAuth } from '@/hooks/useAuth'
 import { getNotesCollection } from '@/lib/firebase/firestore'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { ui } from '@/lib/theme'
 
 export function NotesList() {
   const { user } = useAuth()
@@ -21,9 +20,9 @@ export function NotesList() {
   return (
     <ul className="space-y-2">
       {notes.map((note) => (
-        <li key={note.id} className={ui.card}>
-          <h3 className="font-semibold text-[#222222]">{note.title}</h3>
-          <p className="text-sm text-gray-600">{note.body}</p>
+        <li key={note.id} className="rounded-lg border p-4">
+          <h3 className="font-medium">{note.title}</h3>
+          <p className="text-sm text-zinc-500">{note.body}</p>
         </li>
       ))}
     </ul>

@@ -1,31 +1,4 @@
 {
-  "indexes": [
-    {
-      "collectionGroup": "hrKnowledge",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "embedding",
-          "vectorConfig": {
-            "dimension": 768,
-            "flat": {}
-          }
-        }
-      ]
-    },
-    {
-      "collectionGroup": "faqAnswers",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "embedding",
-          "vectorConfig": {
-            "dimension": 768,
-            "flat": {}
-          }
-        }
-      ]
-    }
-  ],
+  "indexes": [],
   "fieldOverrides": []
 }

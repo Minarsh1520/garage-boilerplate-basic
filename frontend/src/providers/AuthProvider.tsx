@@ -13,7 +13,6 @@ import {
 } from '@/lib/firebase/auth'
 import type { AuthContextValue } from '@/types/auth'
 import type { UserProfile } from '@/types/firestore'
-import { claimPendingEmployee } from '@/actions/employee.actions'
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
@@ -97,8 +96,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userProfile = await syncUserProfile(firebaseUser)
         setProfile(userProfile)
         await setSessionCookie()
-        const idToken = await firebaseUser.getIdToken()
-        await claimPendingEmployee(idToken)
       } else {
         setUser(null)
         setProfile(null)
