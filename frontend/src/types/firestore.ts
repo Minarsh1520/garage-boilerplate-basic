@@ -14,7 +14,8 @@ export interface UserProfile {
   email: string
   displayName: string | null
   photoURL: string | null
-  role: 'user'
+  role: 'user' | 'admin'
+  tourCompleted?: boolean
   createdAt: Timestamp
   updatedAt: Timestamp
   _schemaVersion: 1
@@ -31,3 +32,21 @@ export interface Note {
   updatedAt: Timestamp
   _schemaVersion: 1
 }
+
+// One row per chunk of an approved policy document. Parent-document info is
+// copied onto every chunk so a search hit is self-describing (no second read).
+export interface PolicyChunk {
+  policyId: string        // stable slug, e.g. 'leave-policy' — groups a document's chunks
+  policyTitle: string     // shown to the employee as the answer's source
+  chunkIndex: number      // original order, used to rebuild the full document
+  headingPath: string     // e.g. 'Leave Policy > Requesting leave' (from the chunker)
+  context: string         // LLM-written situating text — embedded for search, never displayed
+  text: string            // the ORIGINAL policy wording — the only text shown to employees
+  // embedding: Firestore VectorValue, written via the Admin SDK only — deliberately not typed here
+  createdAt: Timestamp
+  _schemaVersion: 1
+}
+
+// The employee onboarding record (`employeeData/{uid}`) is typed in src/lib/onboarding.ts.
+// An escalation case (`escalationCases/{id}`) is written by
+// src/features/chatbot/lib/escalation.ts and read by src/actions/escalation.actions.ts.

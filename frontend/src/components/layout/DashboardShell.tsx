@@ -1,16 +1,31 @@
 import type { ReactNode } from 'react'
 import { Sidebar } from './Sidebar'
 import { Navbar } from './Navbar'
+import { AppTour } from './AppTour'
 
-export function DashboardShell({ children }: { children: ReactNode }) {
+export function DashboardShell({
+  children,
+  isAdmin = false,
+}: {
+  children: ReactNode
+  isAdmin?: boolean // shows the "Admin" link in the sidebar
+}) {
   return (
-    <div className="flex h-screen overflow-hidden bg-zinc-50 dark:bg-zinc-950">
-      <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Navbar />
-        {/* Remove the p-6 */}
-        <main className="flex-1 overflow-y-auto">{children}</main>
+    <div className="flex h-screen flex-col overflow-hidden bg-white">
+      <Navbar showMobileMenu={false} />
+
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar isAdmin={isAdmin} />
+
+        {/* text-[#222222] (Nihal's text colour) is set here for every page inside. globals.css
+            turns page text near-white when the computer is in dark mode, but these pages stay
+            white, so any text without its own colour faded out. */}
+        <main className="flex-1 overflow-y-auto bg-white pb-20 text-[#222222] lg:pb-0">
+          {children}
+        </main>
       </div>
+
+      <AppTour />
     </div>
   )
 }
