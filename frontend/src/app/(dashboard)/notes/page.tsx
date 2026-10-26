@@ -3,14 +3,13 @@ import { requireAuth } from '@/actions/auth.actions'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { CreateNoteForm } from '@/features/notes/components/CreateNoteForm'
 import { NotesList } from '@/features/notes/components/NotesList'
-import { ui } from '@/lib/theme'
 
 export const metadata: Metadata = { title: 'Notes' }
 
 export default async function NotesPage() {
   await requireAuth()
   return (
-    <div className={`${ui.page} space-y-6`}>
+    <div className="space-y-6">
       <PageHeader title="Notes" description="Your personal notes" />
       <CreateNoteForm />
       <NotesList />

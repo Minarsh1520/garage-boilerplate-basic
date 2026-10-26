@@ -92,25 +92,23 @@ export default function TeamPage() {
     return (
     // min-h-full stretches this div to fill <main>'s full content-box height
     // (DashboardShell.tsx's <main> has a definite height via flexbox
-    // Colours follow the app's pattern (lib/theme.ts): blue bars instead of the old red, so
-    // this page matches every other page. No dark-mode colours: the app is designed for white.
-    <div className = "flex min-h-full flex-col bg-white text-[#222222]">
+    <div className = "flex min-h-full flex-col bg-zinc-50 dark:bg-zinc-950">
         {/*Project Header*/}
         {/*  PM wants the everything to be full width, so header, subheader, and cards share one width. */}
-        <header className = "w-full bg-[#4361AB] px-4 py-3 sm:px-6 md:px-8">
-        <h1 className = "text-lg font-bold text-white sm:text-xl md:text-2xl">
+        <header className = "w-full bg-brand-red px-4 py-3 sm:px-6 md:px-8">
+        <h1 className = "text-lg font-normal text-white sm:text-xl md:text-2xl">
             Project 29 Garage - AI Assistant for HR
         </h1>
         </header>
       {/* Sub Header */}
         <section className = "w-full bg-white px-4 py-2 sm:px-6 md:px-8">
-        <h2 className = "text-md font-bold text-[#222222] sm:text-lg md:text-xl">
+        <h2 className = "text-md text-black font-medium sm:text-lg md:text-xl">
             Team Members
         </h2>
         </section>
       {/* TeamPage Content */}
         {/* Remove the cap on width limit*/}
-        <section className = "w-full flex-1 space-y-2 bg-[#DDE8F2] p-2 sm:px-6 md:px-8">
+        <section className = "w-full flex-1 space-y-2 bg-brand-red p-2 sm:px-6 md:px-8">
         {teamMembers.map((member, index) => (
             <article
                 key={member.name}
@@ -131,20 +129,20 @@ export default function TeamPage() {
                         // (75px on mobile, 96px from sm: up) instead of 75%
                         // of an unbounded column — this is what was making
                         // the circle balloon on wide screens
-                        className="aspect-square w-3/4 rounded-full border-2 border-[#4361AB] object-cover"
+                        className="aspect-square w-3/4 rounded-full border-2 border-white object-cover"
                     />
                 </div>
 
-                <div className="rounded-r-lg border border-gray-300 bg-white p-[clamp(1rem,0.75rem+1vw,2rem)] shadow-sm">
-                    <h3 className="font-semibold text-[#222222] text-[clamp(0.875rem,0.75rem+0.6vw,1.25rem)]">
+                <div className="rounded-r-lg border border-zinc-200 bg-white p-[clamp(1rem,0.75rem+1vw,2rem)] shadow-sm">
+                    <h3 className="font-semibold text-black text-[clamp(0.875rem,0.75rem+0.6vw,1.25rem)]">
                         {member.name}
                     </h3>
 
-                    <p className="text-[clamp(0.75rem,0.65rem+0.5vw,1rem)] font-semibold text-[#4361AB]">
+                    <p className="text-[clamp(0.75rem,0.65rem+0.5vw,1rem)] text-zinc-600">
                         {member.role}
                     </p>
 
-                    <div className="mt-2 text-[clamp(0.75rem,0.65rem+0.5vw,1rem)] text-[#222222]">
+                    <div className="mt-2 text-[clamp(0.75rem,0.65rem+0.5vw,1rem)] text-zinc-700">
                         {member.description}
                     </div>
                 </div>
